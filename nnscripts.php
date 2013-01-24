@@ -52,6 +52,9 @@ class NNScripts
      */
     public function __construct( $scriptName, $version )
     {
+        // Check correct php version
+        $this->checkPHPVersion();
+
         // Set the script name and version
         $this->scriptName = $scriptName;
         $this->version = $version;
@@ -82,6 +85,37 @@ class NNScripts
         if( isset( $_SERVER["HTTP_HOST"] ) && true === $this->display )
         {
             echo '</pre>';
+        }
+    }
+
+
+    /**
+     * Check php version to be 5.4 or greater
+     * 
+     * @return void
+     */
+    protected function checkPHPVersion()
+    {
+        // init
+        $status = false;
+        $currentVersion = 'unknown';
+
+        if( defined('PHP_VERSION') )
+        {
+            $currentVersion = PHP_VERSION;
+            $version = explode( '.', PHP_VERSION );
+            
+            // Main version
+            if( 5 === (int)$version[0] && 4 >= (int)$version[1] )
+            {
+                $status = true;
+            }
+        }
+        
+        // Exit with an error
+        if( false === $status )
+        {
+            throw new Exception( sprintf('NNScripts Error: PHP version required is 5.4, PHP version "%s" found.', $currentVersion) );
         }
     }
 
