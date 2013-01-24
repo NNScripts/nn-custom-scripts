@@ -96,26 +96,13 @@ class NNScripts
      */
     protected function checkPHPVersion()
     {
-        // init
-        $status = false;
-        $currentVersion = 'unknown';
-
-        if( defined('PHP_VERSION') )
-        {
-            $currentVersion = PHP_VERSION;
-            $version = explode( '.', PHP_VERSION );
-            
-            // Main version
-            if( 5 === (int)$version[0] && 4 >= (int)$version[1] )
-            {
-                $status = true;
-            }
-        }
+        // Init
+        $current  = phpversion();
+        $required = '5.4.0';
         
-        // Exit with an error
-        if( false === $status )
+        if( 0 > strnatcmp( $current, $required ) )
         {
-            throw new Exception( sprintf('NNScripts Error: PHP version required is 5.4, PHP version "%s" found.', $currentVersion) );
+            throw new Exception( sprintf( 'NNScripts'. PHP_EOL .'Error: PHP version %s is required but version %s is found.', $required, $current ) );
         }
     }
 
