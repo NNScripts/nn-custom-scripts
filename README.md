@@ -8,10 +8,11 @@ Disclamer
 **Use these scripts at your own risk!<br />
 I'm not responsible for loss of data or destroyed databases!**
 
-Although these scripts are tested against a updated NewzNab+ release, it may happen that a script runs into an unexpected error.
+Although these scripts are tested against an updated NewzNab+ release, it may happen that a script runs into an unexpected error.<br />
 You can help by reporting problems/errors or by forking these scripts and creating a pull-request.
 
-Before reporting an error, please run the script with "debug" setting enabled. Provide the output and possible php/sql error's as well (make sure your php installation is configured to display errors).
+Before reporting an error, please run the script with the "display" setting enabled.<br />
+Provide the output and possible php/sql error's as well (make sure your php installation is configured to display errors).
 
 Scripts
 -------
