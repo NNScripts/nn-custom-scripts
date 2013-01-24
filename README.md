@@ -32,5 +32,11 @@ This script will remove releases from non active categories.<br />
 _By default the script does not remove any releases. If you want to remove the releases, read the file documentation in the header!_
 
 **remove\_parts\_without\_releases.php**</br />
-This script will remove parts wich are not linked to a release.
+This script will remove parts wich are not linked to a release.<br />
 _By default the script does not remove any releases. If you want to remove the releases, read the file documentation in the header!_
+
+**remove\_unwanted\_releases.php**</br />
+This scripts removes releases based on custom created queries.<br />
+_By default the script does not remove any releases. If you want to remove the releases, read the file documentation in the header!_<br />
+READ THE INSTRUCTIONS IN THIS FILE. WRONGLY CREATED CUSTOM QUERIES CAN REMOVE THE WRONG RELEASES.<br />
+ONCE REMOVED THERE IS NO WAY TO GET THE RELEASES BACK (UNLESS YOU MADE A BACKUP BEFORE)<br />
