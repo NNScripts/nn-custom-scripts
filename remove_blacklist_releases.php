@@ -236,7 +236,7 @@ class blacklistReleases
                         // Remove release
                         if( defined('REMOVE') && true === REMOVE )
                         {
-                            $releases->delete( $match['ID'] );
+                            $this->releases->delete( $match['ID'] );
                         }
                     }
 
