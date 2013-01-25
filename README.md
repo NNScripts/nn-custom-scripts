@@ -24,7 +24,7 @@ Scripts
 This script will check all your database tables for errors. If found, a repair action is started.
 
 **group_stats.php**<br />
-This script will display group statistics like the "Brose groups" page, but commandline and with the oldest post information.
+This script will display group statistics like the "Browse groups" page, but commandline and with the oldest post information.
 
 **remove\_blacklist\_releases.php**<br />
 This script will remove releases based on your black & whitelists.<br />
