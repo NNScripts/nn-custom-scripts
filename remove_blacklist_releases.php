@@ -10,17 +10,19 @@
  * 
  * Warning: the script does not remove releases by default.
  * If you want to remove the releases, change the REMOVE_RELEASES
- * setting to true on line 35.
+ * setting to true on line 41.
  * 
  * The location of the script needs to be "misc/custom" or the
  * "misc/testing" directory. if used from another location,
- * change lines 43 to 45 to require the correct files.
+ * change lines 45 to 47 to require the correct files.
  *
  * @author    NN Scripts
  * @license   http://opensource.org/licenses/MIT MIT License
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.2  - Make script php 5.3 compatible 
+ *
  * 0.1  - Initial version
  */
 
@@ -173,6 +175,9 @@ class blacklistReleases
      */
     public function cleanup()
     {
+        // For 5.3 compatibility, put th database object in a variable
+        $db = $this->db;
+
         foreach( $this->groups AS $group )
         {
             // Init
@@ -187,8 +192,8 @@ class blacklistReleases
             if( array_key_exists( 'blacklist', $group['regexes'] ) )
             {
                 $run = true;
-                $sql .= sprintf( ' (%s)', implode(' OR ', array_map( function($e) {
-                        $e = $this->db->escapeString( str_replace('\\b', '', $e) );
+                $sql .= sprintf( ' (%s)', implode(' OR ', array_map( function($e) use ( $db ) {
+                        $e = $db->escapeString( str_replace('\\b', '', $e) );
                         return sprintf( "r.name REGEXP %s", $e );
                     }, $group['regexes']['blacklist'] ) )
                 );
@@ -203,8 +208,8 @@ class blacklistReleases
                 }
                 
                 $run = true;
-                $sql .= sprintf( ' (%s)',  implode(' AND ', array_map( function($e) {
-                        $e = $this->db->escapeString( str_replace('\\b', '', $e) );
+                $sql .= sprintf( ' (%s)',  implode(' AND ', array_map( function($e) use ( $db ) {
+                        $e = $db->escapeString( str_replace('\\b', '', $e) );
                         return sprintf( "r.name NOT REGEXP %s", $e );
                     }, $group['regexes']['whitelist'] ) )
                 );
@@ -252,7 +257,7 @@ try
 {
     // Init
     $scriptName    = 'Remove black or whitelisted releases';
-    $scriptVersion = '0.1';
+    $scriptVersion = '0.2';
     
     // Load the NNscript class
     $nnscripts = new NNScripts( $scriptName, $scriptVersion );

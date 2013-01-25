@@ -5,7 +5,7 @@ Custom Newznab+ scripts
 
 Requirements:
 * Newznab+
-* PHP 5.4 or greater
+* PHP 5.3.10 or greater
 
 Disclamer
 ------

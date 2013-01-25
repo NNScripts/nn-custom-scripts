@@ -97,8 +97,8 @@ class NNScripts
     protected function checkPHPVersion()
     {
         // Init
-        $current  = phpversion();
-        $required = '5.4.0';
+	$current  = ( false === strpos( phpversion(), '-' ) ? phpversion() : substr( phpversion(), 0, strpos( phpversion(), '-' ) ) );
+        $required = '5.3.10';
         
         if( 0 > strnatcmp( $current, $required ) )
         {
