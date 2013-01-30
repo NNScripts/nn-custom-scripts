@@ -25,7 +25,7 @@
 define('DISPLAY', true);
 
 // Should the move info be updated?
-define('UPDATE', false);
+define('UPDATE', true);
 //----------------------------------------------------------------------
 
 // Load the application
@@ -97,31 +97,33 @@ class movieInfo
         $movies = $this->db->query( $sql );
         if( is_array( $movies ) && 0 < count( $movies ) )
         {
-            $spacer = false;
-            
             // Build the regexes array
             foreach( $movies AS $row )
             {
-                //var_dump( $row );
-                if( preg_match('/^([a-z\.\_0-9\'\s]+)[\s\._]\(?(19[0-9]{2}|2[0-9]{3})\)?[\s\._].*?(1080|720)p.*?$/i', $row['name'], $matches) )
+                $name = $row['name'];
+                if( preg_match('/^([a-z\.\_0-9\'\s]+)[\s\._]\(?(19[0-9]{2}|2[0-9]{3})\)?[\s\._].*?$/i', $row['name'], $matches) )
                 {
-                    $spacer = true;
-                    $this->nnscripts->display( sprintf( "Updating: %s (%s) ", str_replace(array('.', '_'), ' ', trim($matches[1])), $matches[2] ) );
-                    if( defined('UPDATE') && true === UPDATE )
-                    {
-                        // Update the movie info
-                        $this->movie->updateMovieInfo( $row['imdbID'] );
-                        
-                        // Prevent overloading the remote servers
-                        sleep(2);
-                    }
-                    $this->nnscripts->display( PHP_EOL );
+                    $name = sprintf("%s (%s)", str_replace(array('.', '_'), ' ', trim($matches[1])), $matches[2]);
                 }
-            }
-            
-            if( true === $spacer )
+
+                $this->nnscripts->display( sprintf( "Updating: %s ", $name ) );
+                if( defined('UPDATE') && true === UPDATE )
+                {
+                    // Update the movie info
+                    $this->movie->updateMovieInfo( $row['imdbID'] );
+                        
+                    // Prevent overloading the remote servers
+                    sleep(2);
+                }
                 $this->nnscripts->display( PHP_EOL );
+            }
         }
+        else
+        {
+            $this->nnscripts->display( 'No missing movie information found'. PHP_EOL );
+        }
+        
+        $this->nnscripts->display( PHP_EOL );
     }
 }
 
