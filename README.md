@@ -45,3 +45,7 @@ This scripts removes releases based on custom created queries.<br />
 _By default the script does not remove any releases. If you want to remove the releases, read the file documentation in the header!_<br />
 READ THE INSTRUCTIONS IN THIS FILE. WRONGLY CREATED CUSTOM QUERIES CAN REMOVE THE WRONG RELEASES.<br />
 ONCE REMOVED THERE IS NO WAY TO GET THE RELEASES BACK (UNLESS YOU MADE A BACKUP BEFORE)<br />
+
+**update_missing_movie_info.php**<br />
+This script will update missing movie information (based on releases with missing movie info).<br />
+_By default the script does not update any movie information. If you want to enable the update, read the file documentation in the header!_
