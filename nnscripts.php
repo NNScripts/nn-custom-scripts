@@ -37,11 +37,16 @@ class NNScripts
     private $limit = null;
     
     /**
-     * Shoud data be removed?
+     * Should data be removed?
      * @var null|bool
      */
     private $remove = null;
-
+    
+    /**
+     * Should data be updated?
+     * @var null|bool
+     */
+    private $update = null;
 
 
     /**
@@ -73,6 +78,12 @@ class NNScripts
         {
             $this->remove = ( ( true === REMOVE ) ? true : false );
         }
+        
+        // Should data be updated?
+        if( defined('UPDATE') )
+        {
+            $this->update = ( ( true === UPDATE ) ? true : false );
+        }
     }
     
     
@@ -97,7 +108,7 @@ class NNScripts
     protected function checkPHPVersion()
     {
         // Init
-	$current  = ( false === strpos( phpversion(), '-' ) ? phpversion() : substr( phpversion(), 0, strpos( phpversion(), '-' ) ) );
+        $current  = ( false === strpos( phpversion(), '-' ) ? phpversion() : substr( phpversion(), 0, strpos( phpversion(), '-' ) ) );
         $required = '5.3.10';
         
         if( 0 > strnatcmp( $current, $required ) )
@@ -161,7 +172,7 @@ class NNScripts
         $this->display( sprintf( "%s - version %s". PHP_EOL, $this->scriptName, $this->version ) );
         
         // Display settings?
-        if( null !== $this->limit || null !== $this->remove )
+        if( null !== $this->limit || null !== $this->remove || null !== $this->update )
         {
             $this->display( PHP_EOL .'Settings:' );
             
@@ -185,6 +196,17 @@ class NNScripts
                     $line = 'No data is removed from the database!'. PHP_EOL .'          Change the "REMOVE" setting if you want to remove releases or parts';
                 }
                 $this->display( PHP_EOL . sprintf( "- remove: %s", $line ) );
+            }
+            
+            // Display the "update" setting
+            if( null !== $this->update )
+            {
+                $line = "Data will be updated.";
+                if( true !== $this->update )
+                {
+                    $line = 'No data is updated in the database!'. PHP_EOL .'          Change the "UPDATE" setting if you want to enable update';
+                }
+                $this->display( PHP_EOL . sprintf( "- update: %s", $line ) );
             }
         
             // Spacer
