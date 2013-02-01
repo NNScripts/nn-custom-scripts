@@ -50,7 +50,7 @@ ONCE REMOVED THERE IS NO WAY TO GET THE RELEASES BACK (UNLESS YOU MADE A BACKUP 
 This script will update missing movie information (based on releases with missing movie info).<br />
 _By default the script does not update any movie information. If you want to enable the update, read the file documentation in the header!_
 
-**availabe\_groups.php**<br />
+**available\_groups.php**<br />
 This script will show all available groups.<br />
 You can search using the -s option (example php available_groups.php -s "alt.binaries.*").<br />
-Groups are cached for 24 hours. Cache can be force updated using the -u option.<br />:wq
+Groups are cached for 24 hours. Cache can be force updated using the -u option.<br />
