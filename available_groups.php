@@ -4,14 +4,15 @@
  *
  * The location of the script needs to be "misc/custom" or the
  * "misc/testing" directory. if used from another location,
- * change lines 17 to 20 to require the correct files.
+ * change lines 19 to 21 to require the correct files.
  *
  * @author    NN Scripts
  * @license   http://opensource.org/licenses/MIT MIT License
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
- * 0.1  - Initial version
+ * 0.2 - Fixed cache path
+ * 0.1 - Initial version
  */
 
 // Load the application
@@ -41,7 +42,7 @@ class availableGroups
      * The cache file
      * @var string
      */
-    private $cacheFileName = 'available_groups.cache';
+    private $cacheFileName;
     
     /**
      * The commandline options
@@ -65,6 +66,9 @@ class availableGroups
      */
     public function __construct( NNScripts $nnscripts, Nntp $nntp )
     {
+        // Set the cache file
+        $this->cacheFileName = FS_ROOT . DIRECTORY_SEPARATOR . 'available_groups.cache';
+
         // Set the NNScripts variable
         $this->nnscripts = $nnscripts;
         
@@ -179,7 +183,7 @@ class availableGroups
         {
             // Spacer
             $this->nnscripts->display( PHP_EOL );
-            
+
             // Loop the groups
             foreach( $this->groups AS $row )
             {
