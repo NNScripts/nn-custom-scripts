@@ -4,13 +4,15 @@
  *
  * The location of the script needs to be "misc/custom" or the
  * "misc/testing" directory. if used from another location,
- * change lines 19 to 21 to require the correct files.
+ * change lines 21 to 23 to require the correct files.
  *
  * @author    NN Scripts
  * @license   http://opensource.org/licenses/MIT MIT License
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.3 - Sorting results
+ *       longer cache time (1 week)
  * 0.2 - Fixed cache path
  * 0.1 - Initial version
  */
@@ -154,6 +156,13 @@ class availableGroups
                 }
             }
             $this->nnscripts->display( "done" . PHP_EOL );
+
+            // Sort
+            $this->nnscripts->display( "Sorting results: " );
+            usort( $groups, function($a, $b) {
+                return strnatcasecmp( $a, $b );
+            });
+            $this->nnscripts->display( "done" . PHP_EOL );
            
             // The the cache
             $this->writeCacheFile( $groups );
@@ -236,7 +245,7 @@ class availableGroups
             if( file_exists( $this->cacheFileName ) && is_readable( $this->cacheFileName ) )
             {
                 // Check cache age (1 day)
-                if( filemtime($this->cacheFileName) >= (time() - 86400) )
+                if( filemtime($this->cacheFileName) >= (time() - 604800) )
                 {
                     $ret = file_get_contents( $this->cacheFileName );
                     $ret = unserialize( $ret );
@@ -270,7 +279,7 @@ try
 {
     // Init
     $scriptName    = 'Available newsgroups';
-    $scriptVersion = '0.1';
+    $scriptVersion = '0.3';
     
     // Load the NNscript class
     $nnscripts = new NNScripts( $scriptName, $scriptVersion );
