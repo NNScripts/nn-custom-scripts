@@ -4,14 +4,15 @@
  *
  * The location of the script needs to be "misc/custom" or the
  * "misc/testing" directory. if used from another location,
- * change lines 25 to 27 to require the correct files.
+ * change lines 26 to 28 to require the correct files.
  *
  * @author    NN Scripts
  * @license   http://opensource.org/licenses/MIT MIT License
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
- * 0.1  - Initial version
+ * 0.2 - Added MyISAM check on tables
+ * 0.1 - Initial version
  */
 
 //----------------------------------------------------------------------
@@ -90,8 +91,20 @@ class checkDatabase
             foreach( $tables AS $table )
             {
                 $name = current( $table );
-                $this->tables[] = $name;
-                $this->length = ( $this->length < mb_strlen( $name ) ? mb_strlen( $name ) : $this->length );
+                
+                // Check if database table is of myisam type
+                // Repair only works on myisam
+                $sql = sprintf('SHOW TABLE STATUS WHERE Name = "%s"', $name);
+                $tableInfo = $this->db->query( $sql );
+                if( is_array($tableInfo) && 1 === count($tableInfo) )
+                {
+                    $info = current($tableInfo);
+                    if( 'myisam' === strtolower( $info['Engine'] ) )
+                    {
+                        $this->tables[] = $name;
+                        $this->length = ( $this->length < mb_strlen( $name ) ? mb_strlen( $name ) : $this->length );
+                    }
+                }
             }
         }
     }
@@ -142,6 +155,7 @@ class checkDatabase
         }
         else
         {
+            $this->nnscripts->display('No MyISAM tables found!');
             return false;
         }
     }
@@ -150,8 +164,8 @@ class checkDatabase
 try
 {
     // Init
-    $scriptName    = 'Check and Repair database tables';
-    $scriptVersion = '0.1';
+    $scriptName    = 'Check and Repair database MyISAM tables';
+    $scriptVersion = '0.2';
     
     // Load the NNscript class
     $nnscripts = new NNScripts( $scriptName, $scriptVersion );

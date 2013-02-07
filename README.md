@@ -21,7 +21,8 @@ Provide the output and possible php/sql error's as well (make sure your php inst
 Scripts
 -------
 **check_database.php**<br />
-This script will check all your database tables for errors. If found, a repair action is started.
+This script will check all your database tables (only the available MyISAM tables) for errors.<br />
+If found, a repair action is started.
 
 **group_stats.php**<br />
 This script will display group statistics like the "Browse groups" page, but commandline and with the oldest post information.
