@@ -377,7 +377,7 @@ try
 {
     // Init
     $scriptName    = 'Remove black or whitelisted releases';
-    $scriptVersion = '0.2';
+    $scriptVersion = '0.3';
     
     // Load the NNscript class
     $nnscripts = new NNScripts( $scriptName, $scriptVersion );
