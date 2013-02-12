@@ -48,12 +48,19 @@ class NNScripts
      */
     private $update = null;
 
+    /**
+     * Debug mode
+     * @var bool|null
+     */
+    private $debug = null;
+
 
     /**
      * NNScripts constructor
-     * 
-     * @param string $scriptname
+     *
+     * @param $scriptName
      * @param string $version
+     * @internal param string $scriptname
      */
     public function __construct( $scriptName, $version )
     {
@@ -84,6 +91,12 @@ class NNScripts
         {
             $this->update = ( ( true === UPDATE ) ? true : false );
         }
+
+        // Debug mode?
+        if( defined('DEBUG') )
+        {
+            $this->debug = ( ( true === DEBUG ) ? true : false );
+        }
     }
     
     
@@ -102,7 +115,8 @@ class NNScripts
 
     /**
      * Check php version to be 5.4 or greater
-     * 
+     *
+     * @throws Exception
      * @return void
      */
     protected function checkPHPVersion()
@@ -175,8 +189,14 @@ class NNScripts
         if( null !== $this->limit || null !== $this->remove || null !== $this->update )
         {
             $this->display( PHP_EOL .'Settings:' );
+
+            // Display the "debug" setting
+            if( true === $this->debug )
+            {
+                 $this->display( PHP_EOL . "- debug mode enabled" );
+            }
             
-            // Display the "limit" settings
+            // Display the "limit" setting
             if( null !== $this->limit )
             {
                 $line = 'no limit';
