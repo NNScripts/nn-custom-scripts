@@ -14,13 +14,14 @@
  * 
  * The location of the script needs to be "misc/custom" or the
  * "misc/testing" directory. if used from another location,
- * change lines 58 to 60 to require the correct files.
+ * change lines 59 to 61 to require the correct files.
  *
  * @author    NN Scripts
  * @license   http://opensource.org/licenses/MIT MIT License
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.4 - Show first black/whitelist id with the release when removing
  * 0.3 - Moved checking of regexes to php.
  *       Mysql regexes are not compatible with php's preg regexes.
  *
@@ -170,7 +171,7 @@ class blacklistReleases
         $ret = array();
         
         // Get all the active regexes for a group
-        $sql = sprintf("SELECT b.groupname, b.regex, b.optype
+        $sql = sprintf("SELECT b.ID, b.groupname, b.regex, b.optype
                         FROM binaryblacklist AS b
                         WHERE b.msgcol = 1
                         AND b.status = 1
@@ -181,7 +182,7 @@ class blacklistReleases
             // Build the regexes array
             foreach( $dbRegexes AS $regexRow )
             {
-                $ret[ $this->listType[ $regexRow['optype'] ] ][] = $regexRow['regex'];
+                $ret[ $this->listType[ $regexRow['optype'] ] ][ $regexRow['ID'] ] = $regexRow['regex'];
             }          
         }
         
@@ -224,9 +225,10 @@ class blacklistReleases
                 foreach( $releases AS $release )
                 {
                     // Process the releases
-                    if( false === $this->checkRelease( $group['ID'], $release['name'] ) )
+                    $checkResult = $this->checkRelease( $group['ID'], $release['name'] );
+                    if( true !== $checkResult )
                     {
-                        $this->nnscripts->display( sprintf(' - Removing release: %s (added: %s)'. PHP_EOL, $release['name'], $release['adddate'] ) );
+                        $this->nnscripts->display( sprintf(' - Removing release: %s (matches: %d, added: %s)'. PHP_EOL, $release['name'], $checkResult, $release['adddate'] ) );
                         if( defined('REMOVE') && true === REMOVE )
                         {
                             $this->releases->delete( $release['ID'] );
@@ -339,7 +341,8 @@ class blacklistReleases
                     // Debug message
                     if( defined('DEBUG') && true === DEBUG )
                     {
-                        $this->nnscripts->display( sprintf( 'DEBUG: Release [%s] does not match whitelist regex [%s]'. PHP_EOL, $releaseName, $regex ) );
+                        $this->nnscripts->display( sprintf( "DEBUG: Release [%s] does not match whitelist regex:". PHP_EOL, $releaseName ) );
+                        $this->nnscripts->display( sprintf( "DEBUG: Regex: %s". PHP_EOL, $regex ) );
                     }
 
                     // Return (no further checking needed)
@@ -351,24 +354,69 @@ class blacklistReleases
         // Then check blacklists
         if( array_key_exists('blacklist', $this->groups[ $groupId ]['regexes'] ) )
         {
-            foreach( $this->groups[ $groupId ]['regexes']['blacklist'] AS $regex )
+            foreach( $this->groups[ $groupId ]['regexes']['blacklist'] AS $id => $regex )
             {
-                if( preg_match('/'. $regex .'/i', $releaseName, $matches) )
+                if( preg_match_all('/'. $regex .'/i', $releaseName, $matches) )
                 {
                     // Debug message
                     if( defined('DEBUG') && true === DEBUG )
                     {
-                        $this->nnscripts->display( sprintf( 'DEBUG: Release [%s] does matches blacklist regex [%s]'. PHP_EOL, $releaseName, $regex ) );
-                        $this->nnscripts->display( sprintf( 'DEBUG: Matches: %s'. PHP_EOL, implode(' | ', $matches ) ) );
+                        $this->nnscripts->display( sprintf( "DEBUG: Release [%s] does matches blacklist regex:". PHP_EOL, $releaseName ) );
+                        $this->nnscripts->display( sprintf( "DEBUG: Regex (%d): %s". PHP_EOL, $id, $regex ) );
+                        $this->nnscripts->display( sprintf( "DEBUG: Matches: %s". PHP_EOL, $this->buildMatches( $matches ) ) );
                     }
                     // Return (no further checking needed)
-                    return false;
+                    return $id;
                 }
             }
         }
 
         // All ok, release does not need to be removed
         return true;
+    }
+    
+    
+    /**
+     * DEBUG: Build the match string
+     * 
+     * @param array $matches
+     * @param bool $last
+     * @return string
+     */
+    protected function buildMatches( $matches, $last=true )
+    {
+        // Init
+        $ret = '';
+        $comma = '';
+        
+        // Loop the found matches
+        if( is_array( $matches ) && 0 < count( $matches ) )
+        {
+            foreach( $matches AS $row )
+            {
+                if( is_array( $row ) )
+                {
+                    $row = $this->buildMatches( $row, false );
+                }
+                
+                // Add the row
+                $row = trim( $row );
+                if( '' !== $row )
+                {
+                    $ret .= $comma . $row;
+                    $comma = '|';
+                }
+            }
+        }
+        
+        // Build the correct string
+        if( true === $last )
+        {
+            $ret = implode(' | ', array_unique( explode('|', $ret) ) );
+        }
+        
+        // Return
+        return $ret;
     }
 }
 
@@ -377,7 +425,7 @@ try
 {
     // Init
     $scriptName    = 'Remove black or whitelisted releases';
-    $scriptVersion = '0.3';
+    $scriptVersion = '0.4';
     
     // Load the NNscript class
     $nnscripts = new NNScripts( $scriptName, $scriptVersion );
