@@ -33,6 +33,12 @@ It may happen that scripts like "update\_parsing.php" rename releases after they
 Renaming a release will not trigger the black & whitelists again.<br />
 _By default the script does not remove any releases. If you want to remove the releases, read the file documentation in the header!_
 
+**test_blacklist.php**<br />
+This script can be used to test a string against available black/white lists.<br />
+If matched (or not matched in case of a whitelist) the result is shown, including regex, id and if availabe what part matched.<br />
+This script needs some commandline parameters (-s <string> and/or -g <group>).<br />
+Use the -h parameter for more info.<br />
+
 **remove\_category\_releases.php**<br />
 This script will remove releases from non active categories.<br />
 _By default the script does not remove any releases. If you want to remove the releases, read the file documentation in the header!_
