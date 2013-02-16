@@ -18,9 +18,9 @@
  */
 
 // Load the application
-define('FS_ROOT', realpath(dirname(__FILE__)));
-require_once(FS_ROOT ."/../../www/config.php");
-require_once(FS_ROOT ."/../../www/lib/nntp.php");
+define('FL_ROOT', realpath(dirname(__FILE__)));
+require_once(FL_ROOT ."/../../../www/config.php");
+require_once(FL_ROOT ."/../../../www/lib/nntp.php");
 require_once('nnscripts.php');
 
 /**
@@ -69,7 +69,7 @@ class availableGroups
     public function __construct( NNScripts $nnscripts, Nntp $nntp )
     {
         // Set the cache file
-        $this->cacheFileName = FS_ROOT . DIRECTORY_SEPARATOR . 'available_groups.cache';
+        $this->cacheFileName = FL_ROOT . DIRECTORY_SEPARATOR . 'available_groups.cache';
 
         // Set the NNScripts variable
         $this->nnscripts = $nnscripts;
