@@ -22,6 +22,7 @@
 define('DISPLAY', true);
 //----------------------------------------------------------------------
 
+// changed
 // Load the application
 define('FL_ROOT', realpath(dirname(__FILE__)));
 require_once(FL_ROOT ."/../../../www/config.php");
