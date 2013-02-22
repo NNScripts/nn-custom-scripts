@@ -243,8 +243,12 @@ class groupStats
         $releases = 0;
         foreach( $this->stats AS $group => $stats )
         {
-            $oldest = explode(' ', $stats['oldest']);
-            $oldest = sprintf("%s %s %2s %s", $oldest[0], $oldest[1], $oldest[2], $oldest[3]);
+            $oldest = '';
+            if( "0" !== $stats['oldest'] )
+            {
+                $oldest = explode(' ', $stats['oldest']);
+                $oldest = sprintf("%s %s %2s %s", $oldest[0], $oldest[1], $oldest[2], $oldest[3]);
+            }
             $this->nnscripts->display( sprintf( $line, $group, trim($stats['releases']), trim($stats['lastUpdated']), trim($oldest) ) . PHP_EOL );
             $releases += (int)$stats['releases'];
         }
