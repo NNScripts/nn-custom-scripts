@@ -31,8 +31,8 @@ define('QUERYLIMIT', 10000);
 //----------------------------------------------------------------------
 
 // Load the application
-define('FS_ROOT', realpath(dirname(__FILE__)));
-require_once(FS_ROOT ."/../../www/config.php");
+define('FL_ROOT', realpath(dirname(__FILE__)));
+require_once(FL_ROOT ."/../../../www/config.php");
 require_once(WWW_DIR."/lib/framework/db.php");
 require_once('nnscripts.php');
 

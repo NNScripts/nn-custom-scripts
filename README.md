@@ -1,6 +1,9 @@
 nn-custom-scripts
 =================
 
+    Ruhllatio - 02152013 - Updated scripts to reflect changes in NN+ SVN updates.
+    Git this into /misc/testing/ for proper path alignment
+
 Custom Newznab+ scripts
 
 Requirements:
