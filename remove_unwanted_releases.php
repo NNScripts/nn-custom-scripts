@@ -254,8 +254,6 @@ class remove_unwanted_releases extends NNScripts
                     }
                 }
                 
-                echo $query['query'] . PHP_EOL . PHP_EOL;
-                
                 // Check if there are releases to remove
                 $result = $this->db->query( $query['query'] );
                 if( is_array($result) && 0 < count($result) )
