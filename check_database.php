@@ -11,40 +11,43 @@
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.3 - Added settings.ini
+ *       Start using nnscript library
+ *
  * 0.2 - Added MyISAM check on tables
+ *
  * 0.1 - Initial version
  */
-
 //----------------------------------------------------------------------
-// Settings
-
-// Display settings
-define('DISPLAY', true);
-//----------------------------------------------------------------------
-
 // Load the application
-define('FS_ROOT', realpath(dirname(__FILE__)));
-require_once(FS_ROOT ."/../../www/config.php");
-require_once(WWW_DIR."/lib/framework/db.php");
-require_once('nnscripts.php');
+define( 'FS_ROOT', realpath( dirname(__FILE__) ) );
+
+// nnscripts includes
+require_once(FS_ROOT ."/lib/nnscripts.php");
 
 
 /**
  * Check and repair database tables
  */
-class checkDatabase
+class check_database extends NNScripts
 {
     /**
-     * NNScripts class
-     * @var NNScripts
+     * The script name
+     * @var string
      */
-    private $nnscripts;
+    protected $scriptName = 'Check and Repair database MyISAM tables';
     
     /**
-     * The mysqli database connection
-     * @var DB
+     * The script version
+     * @var string
      */
-    private $db;
+    protected $scriptVersion = '0.3';
+    
+    /**
+     * Allowed settings
+     * @var array
+     */
+    protected $allowedSettings = array('display');
     
     /**
      * All the database tables
@@ -57,26 +60,36 @@ class checkDatabase
      * @var int
      */
     private $length = 0;
-
-
-
+    
     /**
-     * Constructor
-     * 
+     * Disable the limit setting
+     * @var bool
      */
-    public function __construct( NNScripts $nnscripts, DB $db ) 
+    protected $nolimit = true;
+    
+    
+    
+    /**
+     * The constructor
+     *
+     */
+    public function __construct()
     {
-        // Set the NNScripts variable
-        $this->nnscripts = $nnscripts;
-        
-        // Set the database connection
-        $this->db = $db;
+        // Call the parent constructor
+        parent::__construct();
 
-        // Get all the database tables
-        $this->getTables();
+        // Show the header
+        $this->displayHeader();
+
+        // Set the commandline options
+        $options = array();
+        $this->setCliOptions( $options, array('display', 'help') );
+        
+        // Show the settings
+        $this->displaySettings();
     }
     
-    
+   
     /**
      * Get all the tabels from the database
      * 
@@ -108,7 +121,8 @@ class checkDatabase
             }
         }
     }
-        
+     
+       
     /**
      * Check and repair all tables
      * 
@@ -116,6 +130,10 @@ class checkDatabase
      */
     public function checkAndRepair()
     {
+        // Get all the database tables
+        $this->getTables();
+        
+        // Default error
         $allowed = array(
             'Found row where the auto_increment column has the value 0',
             'Table is already up to date',
@@ -130,7 +148,7 @@ class checkDatabase
             // Loop all the tables
             foreach( $this->tables as $table )
             {
-                $this->nnscripts->display( sprintf($template, $table) );
+                $this->display( sprintf($template, $table) );
 
                 $sql = sprintf("CHECK TABLE `%s` QUICK", $table);
                 $result = $this->db->query( $sql );
@@ -140,47 +158,35 @@ class checkDatabase
                     $row = $result[0];
                     if( !in_array( $row['Msg_text'], $allowed ) )
                     {
-                        $this->nnscripts->display( $row['Msg_text'] .' : Starting repair ' );
+                        $this->display( $row['Msg_text'] .' : Starting repair ' );
                         $sql = sprintf("REPAIR TABLE `%s`", $table);
                         $result = $this->db->query( $sql );
-                        $this->nnscripts->display( ': Done' );
+                        $this->display( ': Done' );
                     }
                     else
                     {
-                        $this->nnscripts->display( 'OK' );
+                        $this->display( 'OK' );
                     }
-                    $this->nnscripts->display( PHP_EOL );
+                    $this->display( PHP_EOL );
                 }
             }
         }
         else
         {
-            $this->nnscripts->display('No MyISAM tables found!');
-            return false;
+            $this->display('No MyISAM tables found!');
         }
+        
+        // Spacer
+        $this->display( PHP_EOL );
     }
 }
 
+// Main application
 try
 {
-    // Init
-    $scriptName    = 'Check and Repair database MyISAM tables';
-    $scriptVersion = '0.2';
-    
-    // Load the NNscript class
-    $nnscripts = new NNScripts( $scriptName, $scriptVersion );
-    
-    // Display the header
-    $nnscripts->displayHeader();
-    
-    // Load the database
-    $db = new DB;
-    if( !$db )
-        throw new Exception("Error loading database library");
-
-    // Check the database for errors
-    $check = new checkDatabase( $nnscripts, $db );
-    $check->checkAndRepair();
+    // Load the blacklistReleases class
+    $blr = new check_database();
+    $blr->checkAndRepair();
 } catch( Exception $e ) {
     echo $e->getMessage() . PHP_EOL;
 }

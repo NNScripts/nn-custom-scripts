@@ -19,47 +19,58 @@
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.3 - Added the option to clear active categories when a parent
+ *       category is inactive
+ * 
+ * 0.2 - Start using nnscript library
+ *
  * 0.1  - Initial version
  */
  
+/**
+ * @todo
+ * <Tigggger>: hi, noticed something in the remove_category_releases.php
+ * <Tigggger>: If the parent category is set to inactive, but the child categories are left alone (as normally no need to change them all to inactive)
+ * <Tigggger>: the script doesn't remove releases from them, not a biggie changed all mine childs to inactive now, just thought you'd like to know
+ * <Tigggger>: thanks again for the good work 
+ * <cj>: ok, can you create an issue on github, then I will truy to look at it this weekend.
+ * <cj>: I had mine all changed to "inactive", so I didn't notice, but it sounds fair that all child categories should be removed when a parent is inactive
+ * <cj>: or at least it should be an option
+ * <cj>: if you don't have a github account (needed to create the issue), it's not a big problem. I have created a todo for myself 
+ */
 //----------------------------------------------------------------------
-// Settings
-
-// Display settings
-define('DISPLAY', true);
-
-// Time limit on releases to remove in hours
-// example: 24 for 1 day old releases (based on add date)
-// false or 0 to disable
-define('LIMIT', 24);
-
-// Should the releases be removed?
-define('REMOVE', false);
-//----------------------------------------------------------------------
-
 // Load the application
-define('FS_ROOT', realpath(dirname(__FILE__)));
-require_once(FS_ROOT ."/../../www/config.php");
+define( 'FS_ROOT', realpath( dirname(__FILE__) ) );
+
+// nnscripts includes
+require_once(FS_ROOT ."/lib/nnscripts.php");
+
+// newznab includes
 require_once(WWW_DIR."/lib/releases.php");
-require_once('nnscripts.php');
 
 
 /**
  * Remove releases from non-active categories
  */
-class categoryReleases
+class remove_category_releases extends NNScripts
 {
     /**
-     * NNScripts class
-     * @var NNScripts
+     * The script name
+     * @var string
      */
-    private $nnscripts;    
+    protected $scriptName = 'Remove releases from non-active categories';
     
     /**
-     * The database object
-     * @var DB
+     * The script version
+     * @var string
      */
-    private $db;
+    protected $scriptVersion = '0.2';  
+    
+    /**
+     * Allowed settings
+     * @var array
+     */
+    protected $allowedSettings = array('display', 'limit', 'remove');
     
     /**
      * The releases object
@@ -71,28 +82,34 @@ class categoryReleases
      * A list of all the non active categories
      * @var array
      */
-    private $categories;
-
-
-
+    private $categories;    
+    
+    
+    
     /**
-     * Constructor
-     * 
-     * @param NNScripts $nnscripts
-     * @param DB $db
-     * @param Releases $releases
+     * The constructor
+     *
      */
-    public function __construct( NNScripts $nnscripts, DB $db, Releases $releases )
+    public function __construct()
     {
-        // Set the NNScripts variable
-        $this->nnscripts = $nnscripts;
+        // Call the parent constructor
+        parent::__construct();
+
+        // Set the commandline options
+        $options = array();
+        $this->setCliOptions( $options, array('display', 'limit', 'remove', 'help') );
         
-        // Set the database variable
-        $this->db = $db;
+        // Show the header
+        $this->displayHeader();
         
-        // Set the release variable
-        $this->releases = $releases;
+        // Show the settings
+        $this->displaySettings();
         
+        // Load the releases class
+        $this->releases = new Releases();
+        if( !$this->releases )
+             throw new Exception("Error loading releases library");
+             
         // Get a list of the non-active categories
         $this->getCategories();
     }
@@ -115,12 +132,13 @@ class categoryReleases
         $this->categories = $this->db->query( $sql );
     }
     
+    
     /**
-     * Cleanup
+     * remove releases from non-active groups
      * 
      * @return void
      */
-    public function cleanup()
+    public function removeReleases()
     {       
         // Init
         $removed = false;
@@ -134,9 +152,9 @@ class categoryReleases
                             WHERE r.categoryID = %d", $category['ID']);
                 
             // Apply the hour limit
-            if( defined('LIMIT') && is_int( LIMIT ) && 0 < LIMIT )
+            if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
             {
-                $sql .= sprintf(' AND r.adddate < NOW() - INTERVAL %d HOUR', LIMIT);
+                $sql .= sprintf( ' AND r.adddate >= "%s" - INTERVAL %s HOUR', $this->settings['now'], $this->settings['limit'] );
             }
             
             // Execute the query
@@ -148,7 +166,7 @@ class categoryReleases
                 
                 // Print the title
                 $title = ( null !== $category['parent'] ? $category['parent'] .' - ' : '' ) . $category['title'];
-                $this->nnscripts->display( sprintf("Processing releases for category: %s (%d releases)", $title, $total ) );
+                $this->display( sprintf("Processing releases for category: %s (%d releases)", $title, $total ) );
 
                 // Get all the releases to remove
                 $counter = 0;
@@ -156,11 +174,13 @@ class categoryReleases
                 foreach( $rels AS $row )
                 {
                     $removed = true;
-                    if( true === DISPLAY )
+                    if( true === $this->settings['display'] )
                     {
                         // Remove a single release
-                        $this->nnscripts->display( PHP_EOL . " Removing release: ". $row['name'] );
-                        if( defined('REMOVE') && true === REMOVE )
+                        $this->display( PHP_EOL . sprintf(" - %s release: %s", 
+                            ( true === $this->settings['remove'] ? 'Removing' : 'Keeping' ),
+                            $row['name'] ) );
+                        if( true === $this->settings['remove'] )
                         {
                             $this->releases->delete( $row['ID'] );
                         }
@@ -173,7 +193,7 @@ class categoryReleases
                         if( 100 == $counter )
                         {
                             // Remove
-                            if( defined('REMOVE') && true === REMOVE )
+                            if( true === $this->settings['remove'] )
                             {
                                 $this->releases->delete( $ids );
                             }                            
@@ -188,26 +208,27 @@ class categoryReleases
                 // Remove the rest of the found releases
                 if( 0 < count($ids) )
                 {
-                    if( defined('REMOVE') && true === REMOVE )
+                    if( true === $this->settings['remove'] )
                     {
                         $this->releases->delete( $ids );
                     }
                 }
 
                 // Spacer
-                $this->nnscripts->display( PHP_EOL . PHP_EOL );
+                $this->display( PHP_EOL . PHP_EOL );
             }
         }
         
         // No releases found, so no releases removed
         if( false === $removed )
         {
-            $this->nnscripts->display("No releases found!". PHP_EOL);
+            $this->display("No releases found!". PHP_EOL);
         }
         
         // remove broken release parts
         $this->removeBrokenReleaseParts();
     }
+    
     
     /**
      * Remove all the audio, comment, extrafull, files, nfo, subs and video records where the actual release is missing
@@ -229,35 +250,20 @@ class categoryReleases
     }
 }
 
+
+// Main application
 try
 {
-    // Init
-    $scriptName    = 'Remove releases from non-active categories';
-    $scriptVersion = '0.1';
-    
-    // Load the NNscript class
-    $nnscripts = new NNScripts( $scriptName, $scriptVersion );
-    
-    // Display the header
-    $nnscripts->displayHeader();
-    
-    // Load the application part
-    $releases = new Releases;
-    if( !$releases )
-        throw new Exception("Error loading releases library");
-    
-    $db = new DB;
-    if( !$db )
-        throw new Exception("Error loading database library");
-        
+    // Load Sphinx
     $sphinx = new Sphinx();
     
-    // Load the categoryReleases class
-    $cr = new categoryReleases( $nnscripts, $db, $releases );
-    $cr->cleanup();
+    // Display the available groups
+    $stats = new remove_category_releases();
+    $stats->removeReleases();
     
     // Update sphinx
     $sphinx->update();
+    
 } catch( Exception $e ) {
     echo $e->getMessage() . PHP_EOL;
 }
