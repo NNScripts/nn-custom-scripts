@@ -78,12 +78,12 @@ class check_database extends NNScripts
         // Call the parent constructor
         parent::__construct();
 
-        // Show the header
-        $this->displayHeader();
-
         // Set the commandline options
         $options = array();
         $this->setCliOptions( $options, array('display', 'help') );
+
+        // Show the header
+        $this->displayHeader();
         
         // Show the settings
         $this->displaySettings();
