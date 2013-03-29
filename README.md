@@ -39,4 +39,4 @@ Or better:<br >
 2. Create and commit your changes<br />
 3. Open a [Pull Request][1]
 
-[1]: http://github.com/github/markup/pulls
+[1]: https://github.com/NNScripts/nn-custom-scripts/pulls
