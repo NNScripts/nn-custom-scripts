@@ -53,8 +53,8 @@ require_once(WWW_DIR."/lib/category.php");
 //
 //
 // Messages:
-// The messagecan contain a {releases} string which will be replaced
-// with a numbers and the text "releases" for example
+// The message can contain a {releases} string which will be replaced
+// with a number and the text "releases" for example:
 // 1 release or 16 releases
 // If you want a string between the number and the word releases use
 // {releases|bogus} for the word bogus.
