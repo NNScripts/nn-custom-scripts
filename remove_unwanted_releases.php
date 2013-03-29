@@ -70,90 +70,31 @@ require_once(WWW_DIR."/lib/category.php");
 // If a limit is used the message will contain the hours automaticaly
 //
 $queries = array(
-    // Remove all releases with "flac" or "wav" files, or dvd releases (vob, ifo)
-    array(
-        'message' => 'Removing {releases} with "flac, wav" files or dvd releases (vob, ifo)',
-        'query'   => "SELECT DISTINCT rf.releaseID, r.name, r.adddate
-                      FROM `releasefiles` AS rf
-                      INNER JOIN `releases` AS r ON (r.ID = rf.releaseID)
-                      WHERE rf.name REGEXP '\.(flac|wav|vob|ifo)$'
-                      {limit|r.adddate}"
-    ),
-    
+
     // Remove all from other > misc with no files in rar and no nfo file
-    array(
-        'message' => 'Removing {releases} from "other > misc" with no files in rar and no nfo file',
-        'query'   => sprintf("SELECT DISTINCT r.ID AS releaseID, r.name, r.adddate
-                              FROM `releases` r
-                              LEFT JOIN `releasenfo` ri ON (ri.releaseID = r.ID)
-                              WHERE r.categoryID = %d
-                              AND r.rarinnerfilecount = 0
-                              AND ri.ID IS NULL
-                              {limit|r.adddate}", Category::CAT_MISC_OTHER)
-    ),
+//    array(
+//        'message' => 'Removing {releases} from "other > misc" with no files in rar and no nfo file',
+//        'query'   => sprintf("SELECT DISTINCT r.ID AS releaseID, r.name, r.adddate
+//                              FROM `releases` r
+//                              LEFT JOIN `releasenfo` ri ON (ri.releaseID = r.ID)
+//                              WHERE r.categoryID = %d
+//                              AND r.rarinnerfilecount = 0
+//                              AND ri.ID IS NULL
+//                              {limit|r.adddate}", Category::CAT_MISC_OTHER)
+//    ),
 
     // Remove all single file (no mkv) releases from Other > Misc
-    array(
-        'message' => 'Removing all single file (no mkv) releases from other > misc',
-        'query'   => sprintf("SELECT DISTINCT rf.releaseID, r.name, r.adddate
-                              FROM `releasefiles` AS rf
-                              INNER JOIN `releases` AS r ON (r.ID = rf.releaseID)
-                              WHERE rf.name NOT REGEXP '\.(mkv)$'
-                              AND r.categoryID = %d
-                              AND r.rarinnerfilecount = 1
-                              {limit|r.adddate}", Category::CAT_MISC_OTHER)
-    ),
+//    array(
+//        'message' => 'Removing all single file (no mkv) releases from other > misc',
+//        'query'   => sprintf("SELECT DISTINCT rf.releaseID, r.name, r.adddate
+//                              FROM `releasefiles` AS rf
+//                              INNER JOIN `releases` AS r ON (r.ID = rf.releaseID)
+//                              WHERE rf.name NOT REGEXP '\.(mkv)$'
+//                              AND r.categoryID = %d
+//                              AND r.rarinnerfilecount = 1
+//                              {limit|r.adddate}", Category::CAT_MISC_OTHER)
+//    ),
 
-    // Remove all releases from Other > Misc in avi format
-    array(
-        'message' => 'Remove all avi or divx releases from other > misc',
-        'query'   => sprintf("SELECT DISTINCT rv.releaseID, r.name, r.adddate
-                              FROM `releasevideo` rv
-                              INNER JOIN releases r ON (r.ID = rv.releaseID)
-                              WHERE rv.containerformat IN ('AVI','DivX')
-                              AND r.categoryID = %d
-                              {limit|r.adddate}", Category::CAT_MISC_OTHER)
-    ),
-
-    // Remove all "jpg,txt,url" only releases
-    array(
-        'message' => 'Remove all jpg,txt,url,iso file only releases',
-        'query'   => sprintf("SELECT q.ID AS releaseID, q.name, q.adddate
-                              FROM (
-                                  SELECT r.ID, r.name, r.rarinnerfilecount, r.adddate,
-                                        (SELECT count(ID)
-                                         FROM releasefiles AS rf
-                                         WHERE rf.releaseID = r.ID
-                                         AND rf.name REGEXP '\.(jpg|txt|url|iso)$') as filecount
-                                  FROM releases AS r
-                                  WHERE r.categoryID = %d
-                                  AND r.rarinnerfilecount > 0
-                              ) AS q
-                              WHERE q.rarinnerfilecount = q.filecount
-                              {limit|r.adddate}", Category::CAT_MISC_OTHER)
-    ),
-
-    // Remove all bogus releases from alt.binaries.inner-sanctum
-    array(
-        'message' => 'Removing {releases|bogus} from a.b.inner-sanctum',
-        'query'   => sprintf("SELECT DISTINCT r.ID AS releaseID, r.name, r.adddate
-                              FROM `releases` r
-                              INNER JOIN `groups` g ON (g.ID = r.groupID)
-                              WHERE g.name = 'alt.binaries.inner-sanctum'
-                              AND r.categoryID = %d
-                              AND r.name REGEXP '[a-z0-9]{20}'", Category::CAT_MISC_OTHER )
-    ),
-    
-    // Remove all Movies > HD smaller then 2GB
-    array(
-        'message' => 'Remove all Movie > HD/Bluray releases smaller then 2GB in file size',
-        'query'   => sprintf("SELECT DISTINCT r.ID AS releaseID, r.name, r.adddate
-                              FROM  `releases` r
-                              WHERE r.categoryID in (%d, %d)
-                              AND r.size < '2147483648'
-                              ORDER BY r.name ASC", Category::CAT_MOVIE_HD, Category::CAT_MOVIE_BLURAY)
-    ),
-    
 );
 
 
