@@ -11,38 +11,34 @@
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
- * 0.1  - Initial version
+ * 0.2 - Start using nnscript library
+ * 
+ * 0.1 - Initial version
  */
- 
 //----------------------------------------------------------------------
-// Settings
-
-// Display settings
-define('DISPLAY', true);
-//---------------------------------------------------------------------- 
-
 // Load the application
-define('FS_ROOT', realpath(dirname(__FILE__)));
-require_once(FS_ROOT ."/../../www/config.php");
-require_once(WWW_DIR."/lib/framework/db.php");
-require_once('nnscripts.php');
+define( 'FS_ROOT', realpath( dirname(__FILE__) ) );
+
+// nnscripts includes
+require_once(FS_ROOT ."/lib/nnscripts.php");
+
 
 /**
  * Display group statistics
  */
-class groupStats
+class group_stats extends NNScripts
 {
     /**
-     * NNScripts class
-     * @var NNScripts
+     * The script name
+     * @var string
      */
-    private $nnscripts; 
+    protected $scriptName = 'Group Statistics';
     
     /**
-     * The database connection
-     * @var DB
+     * The script version
+     * @var string
      */
-    private $db;
+    protected $scriptVersion = '0.2';
     
     /**
      * The group statistics
@@ -64,18 +60,16 @@ class groupStats
     
     
     /**
-     * Constructor
+     * The constructor
      *
-     * @param NNScripts $nnscripts
-     * @param DB $db
      */
-    public function __construct( NNScripts $nnscripts, DB $db )
+    public function __construct()
     {
-        // Set the NNScripts variable
-        $this->nnscripts = $nnscripts;
-        
-        // Set the database variable
-        $this->db = $db;
+        // Call the parent constructor
+        parent::__construct();
+
+        // Show the header
+        $this->displayHeader();
         
         // Gather the stats
         $this->gatherStats();
@@ -220,7 +214,7 @@ class groupStats
      * 
      * @return void
      */
-    public function display()
+    public function show()
     {
         $line = sprintf( " %%-%ds | %%%ds | %%-%ds | %%%ds",
             ( 5 < $this->length['group'] ? $this->length['group'] : 5 ),
@@ -236,8 +230,8 @@ class groupStats
         $spacer = str_replace(' | ', '-+-', $spacer);
        
         // Display the headers
-        $this->nnscripts->display( sprintf( $line, 'Group', 'Releases', 'Last updated', 'Oldest release' ) . PHP_EOL );
-        $this->nnscripts->display( sprintf( $spacer, '-', '-', '-', '-' ) .'-'. PHP_EOL );
+        $this->display( sprintf( $line, 'Group', 'Releases', 'Last updated', 'Oldest release' ) . PHP_EOL );
+        $this->display( sprintf( $spacer, '-', '-', '-', '-' ) .'-'. PHP_EOL );
         
         // loop the stats
         $releases = 0;
@@ -249,40 +243,27 @@ class groupStats
                 $oldest = explode(' ', $stats['oldest']);
                 $oldest = sprintf("%s %s %2s %s", $oldest[0], $oldest[1], $oldest[2], $oldest[3]);
             }
-            $this->nnscripts->display( sprintf( $line, $group, trim($stats['releases']), trim($stats['lastUpdated']), trim($oldest) ) . PHP_EOL );
+            $this->display( sprintf( $line, $group, trim($stats['releases']), trim($stats['lastUpdated']), trim($oldest) ) . PHP_EOL );
             $releases += (int)$stats['releases'];
         }
 
         // Spacer
-        $this->nnscripts->display( sprintf( $spacer, '-', '-', '-', '-' ) .'-'. PHP_EOL );
+        $this->display( sprintf( $spacer, '-', '-', '-', '-' ) .'-'. PHP_EOL );
 
         // Total releases
         $right = -3 + (( 5 < $this->length['group'] ? $this->length['group'] : 5 ) + ( 8 < $this->length['releases'] ? $this->length['releases'] : 8 ));
         $totalLine = sprintf( " Total %%%ds", $right );
-        $this->nnscripts->display( sprintf( $totalLine, $releases ) . PHP_EOL . PHP_EOL );
+        $this->display( sprintf( $totalLine, $releases ) . PHP_EOL . PHP_EOL );
     }
 }
 
+
+// Main application
 try
 {
-    // Init
-    $scriptName    = 'Group Statistics';
-    $scriptVersion = '0.1';
-    
-    // Load the NNscript class
-    $nnscripts = new NNScripts( $scriptName, $scriptVersion );
-    
-    // Display the header
-    $nnscripts->displayHeader();    
-
-    // Load the database
-    $db = new DB; 
-    if( !$db )
-        throw new Exception("Error loading database library");
-
-    // Display the stats
-    $stats = new groupStats( $nnscripts, $db );
-    $stats->display();
-} catch (Exception $e) {
+    // Display the available groups
+    $stats = new group_stats();
+    $stats->show();
+} catch( Exception $e ) {
     echo $e->getMessage() . PHP_EOL;
 }

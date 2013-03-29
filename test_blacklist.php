@@ -2,55 +2,55 @@
 /**
  * Test is a string/release name is matched by one of the black/white
  * list regexes.
- * 
- * The location of the script needs to be "misc/custom" or the
- * "misc/testing" directory. if used from another location,
- * change lines 26 to 29 to require the correct files.
  *
  * @author    NN Scripts
  * @license   http://opensource.org/licenses/MIT MIT License
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.2 - Start using nnscript library
+ * 
  * 0.1 - Initial version
  */
-
 //----------------------------------------------------------------------
-// Settings
-
-// Display settings
-define('DISPLAY', true);
-//----------------------------------------------------------------------
-
 // Load the application
-define('FS_ROOT', realpath(dirname(__FILE__)));
-require_once(FS_ROOT ."/../../www/config.php");
+define( 'FS_ROOT', realpath( dirname(__FILE__) ) );
+
+// nnscripts includes
+require_once(FS_ROOT ."/lib/nnscripts.php");
+
+// newznab includes
 require_once(WWW_DIR."/lib/releases.php");
-require_once('nnscripts.php');
 
 
 /**
- * Test is a string is catched by one of the black/white list regexes
+ * Test white and blacklists
  */
-class testBlacklist
+class test_blacklist extends NNscripts
 {
     /**
-     * NNScripts class
-     * @var NNScripts
+     * The script name
+     * @var string
      */
-    private $nnscripts;
+    protected $scriptName = 'Test black and whitelists';
     
     /**
-     * The database object
-     * @var DB
+     * The script version
+     * @var string
      */
-    private $db;
+    protected $scriptVersion = '0.2';
     
     /**
-     * The commandline options
+     * Allowed settings
      * @var array
      */
-    private $options = array();
+    protected $allowedSettings = array('display');
+    
+    /**
+     * Help spacer
+     * @var string
+     */
+    private $spacer = "                          ";
     
     /**
      * A list of all the active regexes
@@ -66,143 +66,58 @@ class testBlacklist
         '1' => 'blacklist',
         '2' => 'whitelist'
     );
-
-
-
+    
+    
+    
     /**
-     * Constructor
-     * 
-     * @param NNScripts $nnscripts
-     * @param DB $db
+     * The constructor
+     *
      */
-    public function __construct( NNScripts $nnscripts, DB $db )
+    public function __construct()
     {
-        // Set the NNScripts variable
-        $this->nnscripts = $nnscripts;
-        
-        // Set the database variable
-        $this->db = $db;
+        // Call the parent constructor
+        parent::__construct();
         
         // Set the commandline options
-        $this->setOptions();
-
-        // Get a list of the active groups with theire regexes
-        $this->getGroupRegexes();
-    }
-
-
-    /**
-     * Parse the commandline options
-     * 
-     * @return void
-     */
-    protected function setOptions()
-    {
-        $shortopts = "hs:g:";
-        $longopts = array("help", "string:", "group:");
-        $optionsRaw = getopt($shortopts, $longopts);
-        $options = array();
+        $options = array(
+            array( 's', 'string', Ulrichsg\Getopt::REQUIRED_ARGUMENT, 'The string to perform the tests on' ),
+            array( 'g', 'group', Ulrichsg\Getopt::REQUIRED_ARGUMENT, 'The group to test against.'. PHP_EOL . $this->spacer .'By default all groups are tested' ),
+        );
+        $this->setCliOptions( $options, array('help') );
         
-        // Show help?
-        if( array_key_exists('h', $optionsRaw ) )
-            $this->help();
-            
-        // Build the options array
-        foreach( $optionsRaw AS $key => $value )
-        {
-            switch( $key )
-            {
-                case 'g':
-                case 'group':
-                        $options['group'] = preg_replace( '/^a\.b\./i', 'alt.binaries.', strtolower( $value ) );
-                        break;
-                case 's':
-                case 'string':
-                        $options['string'] = $value;
-                        break;
-            }
-        }
-            
-        // Validate
-        if( !array_key_exists('string', $options) )
-        {
-            throw new Exception('Error: test string must be provided!');
-        }
-            
-        // Set the options globaly
-        $this->options = $options;
+        // Show the header
+        $this->displayHeader();
+
+        // Show the settings
+        $this->displaySettings();
     }
     
     
     /**
-     * Display help
-     * 
-     * @return void
-     */
-    private function help()
-    {
-        echo "Syntax: php available_groups.php [options]\n";
-        echo "\n";
-        echo "Options:\n";
-        echo "   -s, --string       The string to perform the tests on\n";
-        echo "   -g, --group        This group to test against.\n";
-        echo "                        By default all groups are tested\n";
-        echo "\n";
-        exit(0);
-    }
-
-
-    /**
-     * Get all the black/whitelist regexes for a group
-     * 
-     * @param array $group
-     * @return array
-     */
-    protected function getGroupRegexes()
-    {
-        // Init
-        $ret = array();
-        
-        // Get all the active regexes for a group
-        $sql = "SELECT b.ID, b.groupname, b.regex, b.optype
-                FROM binaryblacklist AS b
-                WHERE b.msgcol = 1
-                AND b.status = 1";
-                
-        // Add a group?
-        if( array_key_exists('group', $this->options) )
-        {
-            $groups = array(
-                "'". $this->options['group'] ."'"
-            );
-            $sql .= sprintf( " AND b.groupname IN (%s)", implode(',', $groups) );
-        }
-        
-        $dbRegexes = $this->db->query( $sql );
-        if( is_array( $dbRegexes ) && 0 < count( $dbRegexes ) )
-        {
-            // Build the regexes array
-            foreach( $dbRegexes AS $row )
-            {
-                // Add the regex
-                $ret[ $row['groupname'] ][ $this->listType[ $row['optype'] ] ][ $row['ID'] ] = $row['regex'];
-            }          
-        }
-        
-        // Return
-        $this->regexes = $ret;
-    }
-    
-    
-    /**
-     * Start the testing
+     * Test the black and white lists
      * 
      * @return void
      */
     public function test()
     {
+        // Is a string provided?
+        if( null === $this->options->getOption('string') )
+        {
+            global $argv;
+            $arguments = $argv;
+            $scriptName = array_shift($arguments);
+            $this->display( "Error: test string must be provided!". PHP_EOL . sprintf( "Use php %s -h for help.", $scriptName ) . PHP_EOL );
+            die();
+        }
+        
+        // Get a list of the active groups with theire regexes
+        $this->getGroupRegexes();
+        
         // Header
-        $this->nnscripts->display( sprintf( 'Testing on string: %s'. PHP_EOL, $this->options['string'] ) );
+        $this->display( sprintf( 'Testing on string: %s'. PHP_EOL, $this->options->getOption('string') ) );
+        
+        // Init
+        $found = false;
         
         // Loop all the groups
         foreach( $this->regexes AS $group => $gRegexes )
@@ -221,12 +136,60 @@ class testBlacklist
                         if( false !== $result )
                         {
                             // Display result
+                            $found = true;
                             $this->displayResult( $group, $id, $regex, $type, $result );
                         }
                     }
                 }
             }
         }
+        
+        if( false === $found )
+        {
+            $this->display( PHP_EOL .'No match found!' . PHP_EOL);
+        }
+        $this->display( PHP_EOL );
+    }
+    
+    
+    /**
+     * Get all the black/whitelist regexes for a group
+     * 
+     * @param array $group
+     * @return array
+     */
+    protected function getGroupRegexes()
+    {
+        // Init
+        $ret = array();
+        
+        // Get all the active regexes for a group
+        $sql = "SELECT b.ID, b.groupname, b.regex, b.optype
+                FROM binaryblacklist AS b
+                WHERE b.msgcol = 1
+                AND b.status = 1";
+                
+        // Add a group?
+        if( null !== $this->options->getOption('group') )
+        {
+            $group = preg_replace( '/^a\.b\./i', 'alt.binaries.', $this->options->getOption('group') );
+            $sql .= sprintf( " AND b.groupname = '%s'", $group );
+        }
+
+        // Execute the query
+        $dbRegexes = $this->db->query( $sql );
+        if( is_array( $dbRegexes ) && 0 < count( $dbRegexes ) )
+        {
+            // Build the regexes array
+            foreach( $dbRegexes AS $row )
+            {
+                // Add the regex
+                $ret[ $row['groupname'] ][ $this->listType[ $row['optype'] ] ][ $row['ID'] ] = $row['regex'];
+            }          
+        }
+        
+        // Return
+        $this->regexes = $ret;
     }
     
     
@@ -244,14 +207,14 @@ class testBlacklist
         switch( $type )
         {
             case 'whitelist':
-                if( !preg_match_all( $regex, $this->options['string'] ) )
+                if( !preg_match_all( $regex, $this->options->getOption('string') ) )
                 {
                     return true;
                 }
                 break;
                 
             case 'blacklist':
-                if( preg_match_all( $regex, $this->options['string'], $matches ) )
+                if( preg_match_all( $regex, $this->options->getOption('string'), $matches ) )
                 {
                     return $this->buildMatches( $matches );
                 }
@@ -286,7 +249,7 @@ class testBlacklist
             $template .= sprintf('Matches  : %s'. PHP_EOL, $result);
         }
         
-        $this->nnscripts->display( PHP_EOL . $template );
+        $this->display( PHP_EOL . $template );
     }
 
     
@@ -335,26 +298,12 @@ class testBlacklist
 }
 
 
+// Main application
 try
 {
-    // Init
-    $scriptName    = 'Test black and whitelists';
-    $scriptVersion = '0.1';
-    
-    // Load the NNscript class
-    $nnscripts = new NNScripts( $scriptName, $scriptVersion );
-    
-    // Display the header
-    $nnscripts->displayHeader();
-    
-    $db = new DB;
-    if( !$db )
-        throw new Exception("Error loading database library");
-        
-    // Load the blacklistReleases class
-    $blr = new testBlacklist( $nnscripts, $db );
-    $blr->test();
-    
+    // Load the test_blacklist class
+    $tb = new test_blacklist();
+    $tb->test();
 } catch( Exception $e ) {
     echo $e->getMessage() . PHP_EOL;
 }

@@ -3,61 +3,40 @@ nn-custom-scripts
 
 Custom Newznab+ scripts
 
-Requirements:
-* Newznab+
-* PHP 5.3.10 or greater
+All documentation is available on the project [wiki](https://github.com/NNScripts/nn-custom-scripts/wiki/).
 
-Disclamer
-------
-**Use these scripts at your own risk!<br />
-I'm not responsible for loss of data or destroyed databases!**
+Starting
+-------
+Before using these scripts read the following pages:
 
-Although these scripts are tested against an updated NewzNab+ release, it may happen that a script runs into an unexpected error.<br />
-You can help by reporting problems/errors or by forking these scripts and creating a pull-request.
-
-Before reporting an error, please run the script with the "display" setting enabled.<br />
-Provide the output and possible php/sql error's as well (make sure your php installation is configured to display errors).
+* [Disclaimer](https://github.com/NNScripts/nn-custom-scripts/wiki/Disclaimer)
+* [Requirements](https://github.com/NNScripts/nn-custom-scripts/wiki/Requirements)
+* [Installation](https://github.com/NNScripts/nn-custom-scripts/wiki/Installation)
+* [Configuration](https://github.com/NNScripts/nn-custom-scripts/wiki/Configuration)
+* [Usage](https://github.com/NNScripts/nn-custom-scripts/wiki/Usage)
 
 Scripts
 -------
-**check_database.php**<br />
-This script will check all your database tables (only the available MyISAM tables) for errors.<br />
-If found, a repair action is started.
+Each script has it's own information wiki page:
 
-**group_stats.php**<br />
-This script will display group statistics like the "Browse groups" page, but commandline and with the oldest post information.
+* [Available Groups](https://github.com/NNScripts/nn-custom-scripts/wiki/Available-Groups)
+* [Check Database](https://github.com/NNScripts/nn-custom-scripts/wiki/Check-Database)
+* [Fix Android Releases](https://github.com/NNScripts/nn-custom-scripts/wiki/Fix-Android-Releases)
+* [Group Stats](https://github.com/NNScripts/nn-custom-scripts/wiki/Group-Stats)
+* [Remove Blacklist Releases](https://github.com/NNScripts/nn-custom-scripts/wiki/Remove-Blacklist-Releases)
+* [Remove Category Releases](https://github.com/NNScripts/nn-custom-scripts/wiki/Remove-Category-Releases)
+* [Remove Parts Without Releases](https://github.com/NNScripts/nn-custom-scripts/wiki/Remove-Parts-Without-Releases)
+* [Remove Unwanted Releases](https://github.com/NNScripts/nn-custom-scripts/wiki/Remove-Unwanted-Releases)
+* [Test Blacklist](https://github.com/NNScripts/nn-custom-scripts/wiki/Test-Blacklist)
+* [Update Missing Movie Info](https://github.com/NNScripts/nn-custom-scripts/wiki/Update-Missing-Movie-Info)
 
-**remove\_blacklist\_releases.php**<br />
-This script will remove releases based on your black & whitelists.<br />
-It may happen that scripts like "update\_parsing.php" rename releases after they have been added.<br />
-Renaming a release will not trigger the black & whitelists again.<br />
-_By default the script does not remove any releases. If you want to remove the releases, read the file documentation in the header!_
+Contributing
+------------
+You can always create an [issue](https://github.com/NNScripts/nn-custom-scripts/issues).<br />
+<br />
+Or better:<br >
+1. Fork it.<br />
+2. Create and commit your changes<br />
+3. Open a [Pull Request][1]
 
-**test_blacklist.php**<br />
-This script can be used to test a string against available black/white lists.<br />
-If matched (or not matched in case of a whitelist) the result is shown, including regex, id and if availabe what part matched.<br />
-This script needs some commandline parameters (-s <string> and/or -g <group>).<br />
-Use the -h parameter for more info.<br />
-
-**remove\_category\_releases.php**<br />
-This script will remove releases from non active categories.<br />
-_By default the script does not remove any releases. If you want to remove the releases, read the file documentation in the header!_
-
-**remove\_parts\_without\_releases.php**<br />
-This script will remove parts wich are not linked to a release.<br />
-_By default the script does not remove any releases. If you want to remove the releases, read the file documentation in the header!_
-
-**remove\_unwanted\_releases.php**<br />
-This scripts removes releases based on custom created queries.<br />
-_By default the script does not remove any releases. If you want to remove the releases, read the file documentation in the header!_<br />
-READ THE INSTRUCTIONS IN THIS FILE. WRONGLY CREATED CUSTOM QUERIES CAN REMOVE THE WRONG RELEASES.<br />
-ONCE REMOVED THERE IS NO WAY TO GET THE RELEASES BACK (UNLESS YOU MADE A BACKUP BEFORE)<br />
-
-**update\_missing\_movie\_info.php**<br />
-This script will update missing movie information (based on releases with missing movie info).<br />
-_By default the script does not update any movie information. If you want to enable the update, read the file documentation in the header!_
-
-**available\_groups.php**<br />
-This script will show all available groups.<br />
-You can search using the -s option (example php available_groups.php -s "alt.binaries.*").<br />
-Groups are cached for 24 hours. Cache can be force updated using the -u option.<br />
+[1]: http://github.com/github/markup/pulls

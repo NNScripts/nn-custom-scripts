@@ -9,19 +9,32 @@
  * releases which do not pass the filters.
  * 
  * Warning: the script does not remove releases by default.
- * If you want to remove the releases, change the REMOVE
- * setting to true on line 51.
- * 
- * The location of the script needs to be "misc/custom" or the
- * "misc/testing" directory. if used from another location,
- * change lines 59 to 61 to require the correct files.
+ * If you want to remove the releases, change the settings.ini file
+ * or use the commandline parameters
  *
  * @author    NN Scripts
  * @license   http://opensource.org/licenses/MIT MIT License
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.6 - Added limit from site config
+ *       changes in libraries
+ *       Added settings.ini
+ *       Start using nnscript library
+ *
+ * 0.5 - Added the option to check all releases against regexes
+ *       The option "-f" must be provided (commandline) to scan the 
+ *       full database (Warning: This may take some time)
+ * 
+ *       Added the option to remove releases only in one group
+ * 
+ *       Moved the nnscript libarary to the lib directory
+ *       
+ *       Added the 3th party Getopt library
+ *       (https://github.com/ulrichsg/getopt-php)
+ * 
  * 0.4 - Show first black/whitelist id with the release when removing
+ * 
  * 0.3 - Moved checking of regexes to php.
  *       Mysql regexes are not compatible with php's preg regexes.
  *
@@ -38,59 +51,64 @@
  */
 
 //----------------------------------------------------------------------
-// Settings
-
-// Display settings
-define('DISPLAY', true);
-
-// Time limit on releases to remove in hours
-// example: 24 for 1 day old releases (based on add date)
-// false or 0 to disable
-define('LIMIT', 24);
-
-// Should the releases be removed?
-define('REMOVE', false);
-
-// Show debug messages
-define('DEBUG', false);
-//----------------------------------------------------------------------
-
 // Load the application
-define('FS_ROOT', realpath(dirname(__FILE__)));
-require_once(FS_ROOT ."/../../www/config.php");
+define( 'FS_ROOT', realpath( dirname(__FILE__) ) );
+
+// nnscripts includes
+require_once(FS_ROOT ."/lib/nnscripts.php");
+
+// newznab includes
 require_once(WWW_DIR."/lib/releases.php");
-require_once('nnscripts.php');
+
 
 
 /**
  * Remove releases which do not match black or whitelists
  */
-class blacklistReleases
+class remove_blacklist_releases extends NNScripts
 {
     /**
-     * NNScripts class
-     * @var NNScripts
+     * The script name
+     * @var string
      */
-    private $nnscripts;    
+    protected $scriptName = 'Remove black or whitelisted releases';
     
     /**
-     * The database object
-     * @var DB
+     * The script version
+     * @var string
      */
-    private $db;
+    protected $scriptVersion = '0.6';
     
+    /**
+     * Allowed settings
+     * @var array
+     */
+    protected $allowedSettings = array('display', 'limit', 'full', 'remove', 'debug');
+
     /**
      * The releases object
      * @var Releases
      */
     private $releases;
-    
+
     /**
      * A list of all the active groups
      * @var array
      */
     private $groups;
-    
+
+    /**
+     * All the regexes (grouped by group)
+     * @var array
+     */
+    private $regexes;
+
+    /**
+     * The last debug message
+     * @var string
+     */
+    private $lastDebug = '';
+
     /**
      * The known list types
      * @var array
@@ -100,51 +118,89 @@ class blacklistReleases
         '2' => 'whitelist'
     );
 
-    /**
-     * The current date + time
-     * @var string
-     */
-    private $now;
-
 
 
     /**
-     * Constructor
-     * 
-     * @param NNScripts $nnscripts
-     * @param DB $db
-     * @param Releases $releases
+     * The constructor
+     *
      */
-    public function __construct( NNScripts $nnscripts, DB $db, Releases $releases )
+    public function __construct()
     {
-        // Set the NNScripts variable
-        $this->nnscripts = $nnscripts;
-        
-        // Set the database variable
-        $this->db = $db;
-        
-        // Set the release variable
-        $this->releases = $releases;
+        // Call the parent constructor
+        parent::__construct();
 
+        // Set the commandline options
+        $options = array(
+            array( 'f', 'full',  Ulrichsg\Getopt::NO_ARGUMENT,       'Check all releases (full database)' ),
+            array( 'g', 'group', Ulrichsg\Getopt::REQUIRED_ARGUMENT, 'Remove releases only from one group' ),
+        );
+        $this->setCliOptions( $options, array('limit', 'remove', 'display', 'debug', 'help') );
+                
+        // Show the header
+        $this->displayHeader();                
+                
+        // Show the settings
+        $this->displaySettings();
+
+        // Load the releases class
+        $this->releases = new Releases();
+    }
+
+
+    /**
+     * Remove black/white list releases
+     */
+    public function cleanup()
+    {
         // Get a list of the active groups with theire regexes
         $this->buildGroupList();
 
-        // Add the "now" date
-        $this->now = date('Y-m-d H:i:s');
+        // Build the regex list
+        $this->buildGroupRegexes();
+
+        // Check full database or normal (active/one group)
+        if( true === $this->settings['full'] )
+        {
+            // Check the full database
+            $this->checkFullDatabase();
+        }
+        else
+        {
+            // Check all groups or a single group
+            $this->checkGroups();
+        }
     }
+
 
     /**
      * Build a list of all the active groups with there regexes
-     * 
+     *
      * @return void
      */
     protected function buildGroupList()
     {
-        // Get a list of all the groups
+        // Init
         $sql = "SELECT g.ID, g.name
                 FROM groups AS g
-                WHERE g.active = 1
+                WHERE %s
                 ORDER BY g.name ASC";
+
+        // One or all active groups
+        $group = $this->options->getOption('group');
+        $full  = $this->options->getOption('full');
+        if( null === $group || null !== $full )
+        {
+            // Check all groups
+            $sql = sprintf( $sql, "g.active = 1" );
+        }
+        else
+        {
+            // Check one group
+            $group = preg_replace('/^a\.b\./i', 'alt.binaries.', $group);
+            $sql = sprintf( $sql, sprintf("g.name = %s", $this->db->escapeString( $group ) ) );
+        }
+
+        // Get the groups
         $groups = $this->db->query( $sql );
         if( is_array( $groups ) && 0 < count( $groups ) )
         {
@@ -152,96 +208,104 @@ class blacklistReleases
             foreach( $groups AS $group )
             {
                 // Get the regexes
-                $group['regexes'] = $this->getGroupRegexes( $group );
-                $this->groups[ $group['ID'] ] = $group;
+                //$group['regexes'] = $this->getGroupRegexes( $group );
+                $this->groups[ $group['name'] ] = (int)$group['ID'];
             }
         }
     }
-    
-    
+
+
     /**
      * Get all the black/whitelist regexes for a group
-     * 
-     * @param array $group
+     *
+     * @internal param array $group
      * @return array
      */
-    protected function getGroupRegexes( array $group )
+    protected function buildGroupRegexes()
     {
         // Init
-        $ret = array();
-        
+        $ret = array(
+            'alt.binaries.*' => array()     // Make sure the a.b.* exists
+        );
+
         // Get all the active regexes for a group
-        $sql = sprintf("SELECT b.ID, b.groupname, b.regex, b.optype
-                        FROM binaryblacklist AS b
-                        WHERE b.msgcol = 1
-                        AND b.status = 1
-                        AND b.groupname IN ('alt.binaries.*', '%s')", $group['name']);
+        $sql = "SELECT b.ID, b.groupname, b.regex, b.optype
+                FROM binaryblacklist AS b
+                WHERE b.msgcol = 1
+                AND b.status = 1
+                ORDER BY b.groupname ASC";
         $dbRegexes = $this->db->query( $sql );
         if( is_array( $dbRegexes ) && 0 < count( $dbRegexes ) )
         {
             // Build the regexes array
-            foreach( $dbRegexes AS $regexRow )
+            foreach( $dbRegexes AS $row )
             {
-                $ret[ $this->listType[ $regexRow['optype'] ] ][ $regexRow['ID'] ] = $regexRow['regex'];
-            }          
+                if( !array_key_exists( $row['groupname'], $ret ) )
+                {
+                    $ret[ $row['groupname'] ] = array();
+                }
+                $ret[ $row['groupname'] ][ $this->listType[ $row['optype'] ] ][ $row['ID'] ] = $row['regex'];
+            }
         }
-        
+
         // Return
-        return $ret;
+        $this->regexes = $ret;
     }
-    
-    
+
+
     /**
-     * Start the cleanup
-     * 
+     * Check the full database
+     *
      * @return void
      */
-    public function cleanup()
+    protected function checkFullDatabase()
     {
-        // For 5.3 compatibility, put th database object in a variable
-        $db = $this->db;
+        $total = $this->getTotalReleasesForGroup( null );
+        $this->display(
+            sprintf(
+                'Checking full database (%d release%s):'. PHP_EOL,
+                $total,
+                ( 1 === $total ? '' : 's')
+            )
+        );
 
-        foreach( $this->groups AS $group )
+        // Loop all the releases
+        $this->loopReleases( $total );
+    }
+
+
+    /**
+     * Check all or one group
+     *
+     * @return void
+     */
+    protected function checkGroups()
+    {
+        // Loop all the groups
+        if( is_array( $this->groups ) && 0 < count( $this->groups ) )
         {
-            // Count the number of releases (not flooding memory by retreiving all releases at once)
-            $total = $this->getTotalReleasesForGroup( $group['ID'] );
-
-            // Init
-            $this->nnscripts->display(
-                sprintf(
-                    'Checking group %s (%d release%s):'. PHP_EOL,
-                    $group['name'],
-                    $total,
-                    ( 1 === $total ? '' : 's')
-                )
-            );
-
-            // Retrieve in groups of 100 releases
-            $lastId = null;
-            while( $total > 0 )
+            foreach( $this->groups AS $group => $groupId )
             {
-                // Get the releases
-                $releases = $this->getReleases( $group['ID'], $lastId, 100 );
-                foreach( $releases AS $release )
-                {
-                    // Process the releases
-                    $checkResult = $this->checkRelease( $group['ID'], $release['name'] );
-                    if( true !== $checkResult )
-                    {
-                        $this->nnscripts->display( sprintf(' - Removing release: %s (matches: %d, added: %s)'. PHP_EOL, $release['name'], $checkResult, $release['adddate'] ) );
-                        if( defined('REMOVE') && true === REMOVE )
-                        {
-                            $this->releases->delete( $release['ID'] );
-                        }
-                    }
+                // Count the number of releases (not flooding memory by retreiving all releases at once)
+                $total = $this->getTotalReleasesForGroup( $groupId );
 
-                    // Update the lastId
-                    $lastId = $release['ID'];
-                }
+                // Init
+                $this->display(
+                    sprintf(
+                        'Checking group %s (%d release%s):'. PHP_EOL,
+                        $group,
+                        $total,
+                        ( 1 === $total ? '' : 's')
+                    )
+                );
 
-                // Done, lower the total count
-                $total -= 100;
+                // Loop all the releases
+                $this->loopReleases( $total, $groupId );
             }
+        }
+        else
+        {
+            $this->display( "No group to check against". PHP_EOL );
         }
     }
 
@@ -252,19 +316,22 @@ class blacklistReleases
      * @param int $groupId
      * @return int
      */
-    protected function getTotalReleasesForGroup( $groupId )
+    protected function getTotalReleasesForGroup( $groupId=null )
     {
         $ret = 0;
 
         // Build the sql
-        $sql = sprintf( "SELECT count(1) AS total
-                         FROM `releases` r
-                         WHERE r.groupID = %d", $groupId );
-        if ( defined('LIMIT') && is_int( LIMIT ) && 0 < LIMIT )
+        $sql = sprintf(
+            "SELECT count(1) AS total
+             FROM `releases` r
+             WHERE %s",
+            ( null !== $groupId ? sprintf( "r.groupID = %d", $groupId ) : '1 = 1' )
+        );
+        if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
         {
-            $sql .= sprintf( ' AND r.adddate >= "%s" - INTERVAL %d HOUR', $this->now, LIMIT );
+            $sql .= sprintf( ' AND r.adddate >= "%s" - INTERVAL %s HOUR', $this->settings['now'], $this->settings['limit'] );
         }
-
+        
         $result = $this->db->queryOneRow( $sql );
         if( is_array($result) && 1 === count($result) )
         {
@@ -277,22 +344,88 @@ class blacklistReleases
 
 
     /**
+     * Loop all the releases
+     *
+     * @param int $total
+     * @param null|int $groupId
+     * @return void
+     */
+    protected function loopReleases( $total, $groupId=null )
+    {
+        // Retrieve in groups of 100 releases
+        $lastId = null;
+        $matched = false;
+        $full = $this->options->getOption('full');
+        while( $total > 0 )
+        {
+            // Get the releases
+            $releases = $this->getReleases( $groupId, $lastId, 100 );
+            foreach( $releases AS $release )
+            {
+                // Process the releases
+                $checkResult = $this->checkRelease( $release );
+                if( false !== $checkResult )
+                {
+                    // Match found, removing
+                    $matched = true;
+                    $this->display( sprintf(
+                            ' - %s release: %s (added: %s%s, matches: %d)'. PHP_EOL,
+                            ( true === $this->settings['remove'] ? 'Removing' : 'Keeping' ),
+                            $release['name'],
+                            $release['adddate'],
+                            ( (null !== $full && null !== $release['groupname']) ? sprintf(', group: %s', preg_replace('/^alt\.binaries\./', 'a.b.', $release['groupname']) ) : '' ),
+                            $checkResult
+                        ) );
+
+                    if( true === $this->settings['debug'] && '' !== $this->lastDebug )
+                    {
+                        $this->display( $this->lastDebug . PHP_EOL );
+                    }
+
+                    if( true === $this->settings['remove'] )
+                    {
+                        $this->releases->delete( $release['ID'] );
+                    }
+                }
+
+                // Update the lastId
+                $lastId = $release['ID'];
+            }
+
+            // Done, lower the total count
+            $total -= 100;
+        }
+
+        // spacer
+        if( true === $matched )
+        {
+            $this->display( PHP_EOL );
+        }
+    }
+
+
+    /**
      * Get releases for a group without flooding the memory
      *
-     * @param int $groupId
+     * @param int|null$groupId
      * @param null|int $lastId
      * @param int $limit
      * @return array
      */
-    protected function getReleases( $groupId, $lastId=null, $limit=100 )
+    protected function getReleases( $groupId=null, $lastId=null, $limit=100 )
     {
         // Init
         $ret = array();
 
         // Built the query
-        $sql = sprintf( "SELECT r.ID, r.name, r.adddate
-                         FROM `releases` r
-                         WHERE r.groupID = %d", $groupId );
+        $sql = sprintf(
+            "SELECT r.ID, r.name, r.adddate, r.groupID,
+                    g.name AS groupname
+             FROM `releases` r
+             LEFT JOIN groups g ON (g.ID = r.groupID)
+             WHERE %s",
+            ( null !== $groupId ? sprintf( "r.groupID = %d", $groupId ) : '1 = 1' )
+        );
 
         // Add the lastId
         if( null !== $lastId )
@@ -301,9 +434,9 @@ class blacklistReleases
         }
 
         // Date limit
-        if ( defined('LIMIT') && is_int( LIMIT ) && 0 < LIMIT )
+        if( null !== $this->settings['limit'] )
         {
-            $sql .= sprintf( ' AND r.adddate >= "%s" - INTERVAL %d HOUR', $this->now, LIMIT );
+            $sql .= sprintf( ' AND r.adddate >= "%s" - INTERVAL %d HOUR', $this->settings['now'], $this->settings['limit'] );
         }
 
         // Add the sorting of the records and the record limit
@@ -325,60 +458,105 @@ class blacklistReleases
     /**
      * Check a release for black/white lists matches
      *
-     * @param int $groupId
-     * @param string $releaseName
+     * @param array $release
      * @return bool
      */
-    protected function checkRelease( $groupId, $releaseName )
+    protected function checkRelease( $release )
     {
-        // First check for whitelists
-        if( array_key_exists('whitelist', $this->groups[ $groupId ]['regexes'] ) )
-        {
-            foreach( $this->groups[ $groupId ]['regexes']['whitelist'] AS $regex )
-            {
-                if( !preg_match('/'. $regex .'/i', $releaseName) )
-                {
-                    // Debug message
-                    if( defined('DEBUG') && true === DEBUG )
-                    {
-                        $this->nnscripts->display( sprintf( "DEBUG: Release [%s] does not match whitelist regex:". PHP_EOL, $releaseName ) );
-                        $this->nnscripts->display( sprintf( "DEBUG: Regex: %s". PHP_EOL, $regex ) );
-                    }
+        // Remove (init)
+        $remove = false;
+        $this->lastDebug = '';
 
-                    // Return (no further checking needed)
-                    return false;
+        // Groups array
+        $groups = array('alt.binaries.*', $release['groupname']);
+        foreach( $groups AS $group )
+        {
+            // Check if the group exists withing the regexes
+            if( array_key_exists( $group, $this->regexes ) )
+            {
+                // Whitelist
+                if( array_key_exists('whitelist', $this->regexes[ $group ] ) )
+                {
+                    if( false === $remove )
+                        $this->checkWhitelist( $this->regexes[ $group ]['whitelist'], $release['name'], $remove );
+                }
+
+                // Blacklist
+                if( array_key_exists('blacklist', $this->regexes[ $group ] ) )
+                {
+                    if( false === $remove )
+                        $this->checkBlacklist( $this->regexes[ $group ]['blacklist'], $release['name'], $remove );
                 }
             }
         }
 
-        // Then check blacklists
-        if( array_key_exists('blacklist', $this->groups[ $groupId ]['regexes'] ) )
-        {
-            foreach( $this->groups[ $groupId ]['regexes']['blacklist'] AS $id => $regex )
-            {
-                if( preg_match_all('/'. $regex .'/i', $releaseName, $matches) )
-                {
-                    // Debug message
-                    if( defined('DEBUG') && true === DEBUG )
-                    {
-                        $this->nnscripts->display( sprintf( "DEBUG: Release [%s] does matches blacklist regex:". PHP_EOL, $releaseName ) );
-                        $this->nnscripts->display( sprintf( "DEBUG: Regex (%d): %s". PHP_EOL, $id, $regex ) );
-                        $this->nnscripts->display( sprintf( "DEBUG: Matches: %s". PHP_EOL, $this->buildMatches( $matches ) ) );
-                    }
-                    // Return (no further checking needed)
-                    return $id;
-                }
-            }
-        }
-
-        // All ok, release does not need to be removed
-        return true;
+        // Return
+        return $remove;
     }
-    
-    
+
+
+    /**
+     * Check whitelist regexes
+     *
+     * @param array $regexes
+     * @param string $releaseName
+     * @param bool $remove
+     * @void return
+     */
+    protected function checkWhitelist( array $regexes, $releaseName, &$remove )
+    {
+        foreach( $regexes AS $id => $regex )
+        {
+            if( !preg_match('/'. $regex .'/i', $releaseName) )
+            {
+                // Debug message
+                if( true === $this->settings['debug'] )
+                {
+                    $this->lastDebug  = sprintf( "   DEBUG: Release [%s] does not match whitelist regex:". PHP_EOL, $releaseName );
+                    $this->lastDebug .= sprintf( "   DEBUG: Regex: %s". PHP_EOL, $regex );
+                }
+
+                // Matches, so remove
+                $remove = $id;
+                return;
+            }
+        }
+    }
+
+
+    /**
+     * Check blacklist regexes
+     *
+     * @param array $regexes
+     * @param string $releaseName
+     * @param bool $remove
+     * @void return
+     */
+    protected function checkBlacklist( array $regexes, $releaseName, &$remove )
+    {
+        foreach( $regexes AS $id => $regex )
+        {
+            if( preg_match_all('/'. $regex .'/i', $releaseName, $matches) )
+            {
+                // Debug message
+                if( true === $this->settings['debug'] )
+                {
+                    $this->lastDebug  = sprintf( "   DEBUG: Release [%s] does matches blacklist regex:". PHP_EOL, $releaseName );
+                    $this->lastDebug .= sprintf( "   DEBUG: Regex (%d): %s". PHP_EOL, $id, $regex );
+                    $this->lastDebug .= sprintf( "   DEBUG: Matches: %s". PHP_EOL, $this->buildMatches( $matches ) );
+                }
+
+                // Matches blacklist, remove.
+                $remove = $id;
+                return;
+            }
+        }
+    }
+
+
     /**
      * DEBUG: Build the match string
-     * 
+     *
      * @param array $matches
      * @param bool $last
      * @return string
@@ -388,7 +566,7 @@ class blacklistReleases
         // Init
         $ret = '';
         $comma = '';
-        
+
         // Loop the found matches
         if( is_array( $matches ) && 0 < count( $matches ) )
         {
@@ -398,7 +576,7 @@ class blacklistReleases
                 {
                     $row = $this->buildMatches( $row, false );
                 }
-                
+
                 // Add the row
                 $row = trim( $row );
                 if( '' !== $row )
@@ -408,46 +586,28 @@ class blacklistReleases
                 }
             }
         }
-        
+
         // Build the correct string
         if( true === $last )
         {
             $ret = implode(' | ', array_unique( explode('|', $ret) ) );
         }
-        
+
         // Return
         return $ret;
     }
 }
 
-
+// Main application
 try
 {
     // Init
-    $scriptName    = 'Remove black or whitelisted releases';
-    $scriptVersion = '0.4';
-    
-    // Load the NNscript class
-    $nnscripts = new NNScripts( $scriptName, $scriptVersion );
-    
-    // Display the header
-    $nnscripts->displayHeader();
-    
-    // Load the application part
-    $releases = new Releases;
-    if( !$releases )
-        throw new Exception("Error loading releases library");
-    
-    $db = new DB;
-    if( !$db )
-        throw new Exception("Error loading database library");
-        
     $sphinx = new Sphinx();
-    
+
     // Load the blacklistReleases class
-    $blr = new blacklistReleases( $nnscripts, $db, $releases );
+    $blr = new remove_blacklist_releases();
     $blr->cleanup();
-    
+
     // Update sphinx
     $sphinx->update();
 } catch( Exception $e ) {
