@@ -187,12 +187,17 @@ class remove_unwanted_releases extends NNScripts
                 // Check if there is a {limit} variable in the query
                 if( preg_match( '/\{limit\|([\.-_a-z0-9]+)\}/i', $query['query'], $matches ) )
                 {
+                    // Empty in case of no limit
+                    $replaceString = '';
+
                     if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
                     {
                         // Build the replace string
                         $replaceString =  sprintf(' AND %s < "%s" - INTERVAL %s HOUR', $matches[1], $this->settings['now'], $this->settings['limit'] );
-                        $query['query'] = str_replace( $matches[0], $replaceString, $query['query'] );
                     }
+
+                    // Replace
+                    $query['query'] = str_replace( $matches[0], $replaceString, $query['query'] );
                 }
                 
                 // Check if there are releases to remove
