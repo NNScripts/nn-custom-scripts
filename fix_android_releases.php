@@ -113,7 +113,7 @@ class fix_android_releases extends NNScripts
                 FROM releases r
                 LEFT JOIN releasefiles rf ON (rf.releaseID = r.ID)
                 WHERE r.name REGEXP '^[v]?[0-9]+([\\s\\.][0-9]+)+(-(Game|Pro))?-AnDrOiD$'";
-        if( null !== $this->settings['limit'] )
+        if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
         {
             $sql .= sprintf( ' AND r.adddate >= "%s" - INTERVAL %s HOUR', $this->settings['now'], $this->settings['limit'] );
         }                     
