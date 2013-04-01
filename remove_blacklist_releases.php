@@ -434,7 +434,7 @@ class remove_blacklist_releases extends NNScripts
         }
 
         // Date limit
-        if( null !== $this->settings['limit'] )
+        if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
         {
             $sql .= sprintf( ' AND r.adddate >= "%s" - INTERVAL %d HOUR', $this->settings['now'], $this->settings['limit'] );
         }
