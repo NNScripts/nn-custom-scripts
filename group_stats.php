@@ -47,6 +47,12 @@ class group_stats extends NNScripts
     private $stats = array();
     
     /**
+     * The total size of all groups together
+     * @var int
+     */
+    private $totalSize = 0;
+
+    /**
      * Max lengths
      * @var array
      */
@@ -54,6 +60,7 @@ class group_stats extends NNScripts
         'group'       => 0,
         'lastUpdated' => 0,
         'releases'    => 0,
+        'size'        => 0,
         'oldest'      => 0
     );
     
@@ -102,11 +109,20 @@ class group_stats extends NNScripts
                 if( strlen( $group['lastUpdated'] ) > $this->length['lastUpdated'] )
                     $this->length['lastUpdated'] = strlen( $group['lastUpdated'] );
 
-                // Add the number of releases
+                // Add the number of releases and size
                 $releases = $this->getNumberOfReleases( $id );
-                $this->stats[ $group['name'] ]['releases'] = $releases;
-                if( strlen( $releases ) > $this->length['releases'] )
-                    $this->length['releases'] = strlen( $releases );
+ 
+                // Releases
+                $this->stats[ $group['name'] ]['releases'] = $releases['total'];
+                if( strlen( $releases['total'] ) > $this->length['releases'] )
+                    $this->length['releases'] = strlen( $releases['total'] );
+
+                // Size
+                $size = $this->formatBytes( $releases['size'] );
+                $this->totalSize += (int)$releases['size'];
+                $this->stats[ $group['name'] ]['size'] = $size;
+                if( strlen( $size ) > $this->length['size'] )
+                    $this->length['size'] = strlen( $size );
                 
                 // Add the date of the oldest release
                 $oldest = $this->getOldestRelease( $id );
@@ -154,22 +170,28 @@ class group_stats extends NNScripts
      * Get the total number of releases
      *
      * @param int $groupId
-     * @return int
+     * @return array
      */
     private function getNumberOfReleases( $groupId )
     {
         // Init
-        $ret = 0;
+        $ret = array(
+            'total' => 0,
+            'size' => 0
+        );
        
         // Get the release count
-        $sql = sprintf("SELECT count(1) AS total
-                        FROM releases
-                        WHERE groupID = %s", $this->db->escapeString( $groupId ));
+        $sql = sprintf("SELECT count(1) AS total, SUM( r.size ) AS size
+                        FROM releases r
+                        WHERE r.groupID = %s", $this->db->escapeString( $groupId ));
         $count = $this->db->query( $sql );
         if( is_array($count) && 1 === count($count) )
         {
             $row = $count[0];
-            $ret = (int)$row['total'];
+            $ret = array(
+                'total' => (int)$row['total'],
+                'size'  => (int)$row['size']
+            );
         }
         
         // Return
@@ -216,9 +238,10 @@ class group_stats extends NNScripts
      */
     public function show()
     {
-        $line = sprintf( " %%-%ds | %%%ds | %%-%ds | %%%ds",
+        $line = sprintf( " %%-%ds | %%%ds | %%%ds | %%-%ds | %%%ds",
             ( 5 < $this->length['group'] ? $this->length['group'] : 5 ),
             ( 8 < $this->length['releases'] ? $this->length['releases'] : 8 ),
+            ( 4 < $this->length['size'] ? $this->length['size'] : 4 ),
             ( 12 < $this->length['lastUpdated'] ? $this->length['lastUpdated'] : 12 ),
             ( 15 < $this->length['oldest'] ? $this->length['oldest'] : 15 )
         );
@@ -230,8 +253,8 @@ class group_stats extends NNScripts
         $spacer = str_replace(' | ', '-+-', $spacer);
        
         // Display the headers
-        $this->display( sprintf( $line, 'Group', 'Releases', 'Last updated', 'Oldest release' ) . PHP_EOL );
-        $this->display( sprintf( $spacer, '-', '-', '-', '-' ) .'-'. PHP_EOL );
+        $this->display( sprintf( $line, 'Group', 'Releases', 'Size', 'Last updated', 'Oldest release' ) . PHP_EOL );
+        $this->display( sprintf( $spacer, '-', '-', '-', '-', '-' ) .'-'. PHP_EOL );
         
         // loop the stats
         $releases = 0;
@@ -243,17 +266,44 @@ class group_stats extends NNScripts
                 $oldest = explode(' ', $stats['oldest']);
                 $oldest = sprintf("%s %s %2s %s", $oldest[0], $oldest[1], $oldest[2], $oldest[3]);
             }
-            $this->display( sprintf( $line, $group, trim($stats['releases']), trim($stats['lastUpdated']), trim($oldest) ) . PHP_EOL );
+            $this->display(
+                sprintf(
+                    $line,
+                    $group,
+                    trim( $stats['releases'] ),
+                    trim( $stats['size'] ),
+                    trim( $stats['lastUpdated'] ),
+                    trim( $oldest )
+                ) . PHP_EOL
+            );
             $releases += (int)$stats['releases'];
         }
 
         // Spacer
-        $this->display( sprintf( $spacer, '-', '-', '-', '-' ) .'-'. PHP_EOL );
+        $this->display( sprintf( $spacer, '-', '-', '-', '-', '-' ) .'-'. PHP_EOL . PHP_EOL );
 
         // Total releases
-        $right = -3 + (( 5 < $this->length['group'] ? $this->length['group'] : 5 ) + ( 8 < $this->length['releases'] ? $this->length['releases'] : 8 ));
-        $totalLine = sprintf( " Total %%%ds", $right );
-        $this->display( sprintf( $totalLine, $releases ) . PHP_EOL . PHP_EOL );
+        $totalSize = $this->formatBytes( $this->totalSize );
+
+        $len = ( strlen( $releases ) > strlen( $totalSize ) ? strlen( $releases ) : strlen( $totalSize ) );
+        $totalReleasesLine = sprintf( " Total Releases : %%%ds", $len );
+        $totalSizeLine     = sprintf( " Total Size     : %%%ds", $len );
+
+        $this->display( sprintf( $totalReleasesLine, $releases ) . PHP_EOL );
+        $this->display( sprintf( $totalSizeLine, $totalSize ) . PHP_EOL . PHP_EOL );
+    }
+
+
+    /**
+     * Format the output
+     * 
+     * @return string
+     */
+    private function formatBytes($bytes, $decimals = 2)
+    {
+        $sz = 'BKMGTP';
+        $factor = floor( ( strlen( $bytes ) - 1 ) / 3 );
+        return sprintf( "%.{$decimals}f", $bytes / pow(1024, $factor) ) .' '. @$sz[$factor];
     }
 }
 
