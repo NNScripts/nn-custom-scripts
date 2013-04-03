@@ -11,6 +11,8 @@
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.3 - Added group size statistics
+ *
  * 0.2 - Start using nnscript library
  * 
  * 0.1 - Initial version
@@ -38,7 +40,7 @@ class group_stats extends NNScripts
      * The script version
      * @var string
      */
-    protected $scriptVersion = '0.2';
+    protected $scriptVersion = '0.3';
     
     /**
      * The group statistics
