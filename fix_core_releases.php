@@ -7,6 +7,8 @@
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.2 - Changed to PDO and prepare statements
+ *
  * 0.1 - Initial version
  */
 //----------------------------------------------------------------------
@@ -35,7 +37,7 @@ class fix_core_releases extends NNScripts
      * The script version
      * @var string
      */
-    protected $scriptVersion = '0.1';
+    protected $scriptVersion = '0.2';
     
     /**
      * Allowed settings
@@ -55,6 +57,11 @@ class fix_core_releases extends NNScripts
      */
     private $fixed = false;
 
+    /**
+     * The query to update the database records
+     * @var null|PDOStatement
+     */
+    private $updateQuery = null;
 
 
 
@@ -108,21 +115,41 @@ class fix_core_releases extends NNScripts
      */
     protected function getReleases()
     {
-        $sql = "SELECT r.ID, r.name, uncompress(rn.nfo) AS nfo
-                FROM releases r
-                INNER JOIN releasenfo rn ON (rn.releaseID = r.ID)
-                WHERE r.searchname = ' Keymaker Windows-CORE'
-                AND r.categoryID = 4010";
+        // Create the query
+        $sql = "
+            SELECT
+                r.ID,
+                r.name,
+                uncompress(rn.nfo) AS nfo
+            FROM
+                releases r
+            INNER JOIN
+                releasenfo rn ON (rn.releaseID = r.ID)
+            WHERE
+                r.searchname = :name
+                AND r.categoryID = :category
+        ";
+                
+        if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
+            $sql .= 'AND r.adddate >= :startDate - INTERVAL :limit HOUR';
+
+        // Prepare the query and bind params
+        $selectQuery = $this->db->prepare( $sql );
+        $selectQuery->bindValue( ':name', ' Keymaker Windows-CORE', PDO::PARAM_STR );
+        $selectQuery->bindValue( ':category', 4010, PDO::PARAM_INT );
+
         if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
         {
-            $sql .= sprintf( ' AND r.adddate >= "%s" - INTERVAL %s HOUR', $this->settings['now'], $this->settings['limit'] );
+            $selectQuery->bindValue( ':startDate', $this->settings['now'], PDO::PARAM_STR );
+            $selectQuery->bindValue( ':limit', $this->settings['limit'], PDO::PARAM_INT );
         }                     
-        $releases = $this->db->query( $sql );
-        if( is_array( $releases ) && 0 < count( $releases ) )
-        {
-            return $releases;
-        }
-        return array();
+
+        // Execute
+        $selectQuery->execute();
+        $releases = $selectQuery->fetchAll( PDO::FETCH_ASSOC );
+
+        // Return
+        return( ( is_array( $releases ) && 0 < count( $releases ) ) ? $releases : array() );
     }
     
             
@@ -135,26 +162,38 @@ class fix_core_releases extends NNScripts
     {
         // Init
         $this->fixed = false;
+        $regex = '/[\s]([a-z0-9\.\s\+_-])*?\*INCL\.KEYMAKER\*/i';
 
-	// Loop all lines to find the one matching the softwarename
-	$regex = '/[\s]([a-z0-9\.\s\+_-])*?\*INCL\.KEYMAKER\*/i';
+        // Loop all lines to find the one matching the softwarename
         foreach( explode("\n", $release['nfo']) AS $line )
         {
             if( preg_match( $regex, $line, $matches ) )
             {
                 // Update
                 $this->fixed = true;
-
                 $title = trim( $matches[0] ) .' - CORE';
                 $this->display( sprintf( 'Fixing release: %s'. PHP_EOL, $title ) );
 
-                $updateSql = sprintf(
-                    'UPDATE releases r SET r.name = %s, r.searchname = %s WHERE r.id = %d',
-                    $this->db->escapeString( str_replace( '.', ' ', $title ) ),
-                    $this->db->escapeString( $title ),
-                    (int)$release['ID']
-                );  
-                $this->db->query( $updateSql );
+                // Build the prepare sql statement
+                if( null === $this->updateQuery ) {
+                    $this->updateQuery = $this->db->prepare('
+                        UPDATE
+                            releases r
+                        SET
+                            r.name = :name,
+                            r.searchname = :searchname
+                        WHERE
+                            r.id = :id
+                    ');
+                }
+
+                // Bind the correct parameters 
+                $this->updateQuery->bindValue( ':name', str_replace( '.', ' ', $title ), PDO::PARAM_STR );
+                $this->updateQuery->bindValue( ':searchname', $title, PDO::PARAM_STR );
+                $this->updateQuery->bindValue( ':id', $release['ID'], PDO::PARAM_INT );
+
+                // Execute
+                $this->updateQuery->execute();
             }
         }
     }

@@ -7,6 +7,10 @@
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.3 - Changed to PDO and prepare statements
+ *
+ * 0.2 - Changed query to catch more android releases
+ *
  * 0.1 - Initial version
  */
 //----------------------------------------------------------------------
@@ -35,7 +39,7 @@ class fix_android_releases extends NNScripts
      * The script version
      * @var string
      */
-    protected $scriptVersion = '0.1';
+    protected $scriptVersion = '0.2';
     
     /**
      * Allowed settings
@@ -55,6 +59,11 @@ class fix_android_releases extends NNScripts
      */
     private $fixed = false;
 
+    /**
+     * The query to update the database records
+     * @var null|PDOStatement
+     */
+    private $updateQuery = null;
 
 
 
@@ -108,21 +117,39 @@ class fix_android_releases extends NNScripts
      */
     protected function getReleases()
     {
-        $sql = "SELECT r.ID, r.name,
+        $sql = "
+            SELECT
+                r.ID, r.name,
                 REPLACE(rf.name, '.apk', '') AS filename
-                FROM releases r
-                LEFT JOIN releasefiles rf ON (rf.releaseID = r.ID)
-                WHERE r.name REGEXP '^[v]?[0-9]+([\\s\\.][0-9]+)+(-(Game|Pro))?-AnDrOiD$'";
+            FROM
+                releases r
+            LEFT JOIN
+                releasefiles rf ON (rf.releaseID = r.ID)
+            WHERE
+            rf.name REGEXP  '\.apk$'
+            AND r.name REGEXP '^[v]?[0-9]+([\\s\\.][0-9]+)+(\\-(Game|Pro))?[\\-\\.]AnDrOiD'
+        ";
+
+        // Add limits
+        if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
+            $sql .= 'AND r.adddate >= :startDate - INTERVAL :limit HOUR';
+
+        // Prepare the query
+        $selectQuery = $this->db->prepare( $sql );
+
+        // Bind the parameters
         if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
         {
-            $sql .= sprintf( ' AND r.adddate >= "%s" - INTERVAL %s HOUR', $this->settings['now'], $this->settings['limit'] );
-        }                     
-        $releases = $this->db->query( $sql );
-        if( is_array( $releases ) && 0 < count( $releases ) )
-        {
-            return $releases;
+            $selectQuery->bindValue( ':startDate', $this->settings['now'], PDO::PARAM_STR );
+            $selectQuery->bindValue( ':limit', $this->settings['limit'], PDO::PARAM_INT );
         }
-        return array();
+
+        // Execute
+        $selectQuery->execute();
+        $releases = $selectQuery->fetchAll(PDO::FETCH_ASSOC);
+
+        // Return
+        return( ( is_array( $releases ) && 0 < count( $releases ) ) ? $releases : array() );
     }
     
             
@@ -137,20 +164,38 @@ class fix_android_releases extends NNScripts
         $this->fixed = false;
         
         // Build the check regex
-        $regex = sprintf( '/%s$/i',preg_quote( $release['name'] ) );
+        $regex = sprintf( '/%s$/i', preg_quote( $release['name'] ) );
         if( preg_match( $regex, $release['filename'] ) )
         {
+            // Get the real filename
+            $filename = preg_split( sprintf('/([%s])/', preg_quote('\\') ), $release['filename'] );
+            $filename = end( $filename );
+
             // Update
             $this->fixed = true;
-            $this->display( sprintf( 'Fixing release: %s'. PHP_EOL, $release['filename'] ) );
-            
-            $updateSql = sprintf(
-                'UPDATE releases r SET r.name = %s, r.searchname = %s WHERE r.id = %d',
-                $this->db->escapeString( str_replace( '.', ' ', $release['filename'] ) ),
-                $this->db->escapeString( $release['filename'] ),
-                (int)$release['ID']
-            );
-            $this->db->query( $updateSql );
+            $this->display( sprintf( 'Fixing release: %s'. PHP_EOL, $filename ) );
+
+            // Build the prepare sql statement
+            if( null === $this->updateQuery ) {
+                $this->updateQuery = $this->db->prepare('
+                    UPDATE
+                        releases r
+                    SET
+                        r.name = :name,
+                        r.searchname = :searchname
+                    WHERE
+                        r.id = :id
+                ');
+            }
+
+            // Bind the correct parameters
+            $name = str_replace( '.', ' ', $filename );
+            $this->updateQuery->bindValue( ':name', $name, PDO::PARAM_STR );
+            $this->updateQuery->bindValue( ':searchname', $filename, PDO::PARAM_STR );
+            $this->updateQuery->bindValue( ':id', $release['ID'], PDO::PARAM_INT );
+
+            // Execute
+            $this->updateQuery->execute();
         }
     }
 }

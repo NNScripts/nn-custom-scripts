@@ -11,10 +11,12 @@
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.4 - Changed to PDO
+ *
  * 0.3 - Added group size statistics
  *
  * 0.2 - Start using nnscript library
- * 
+ *
  * 0.1 - Initial version
  */
 //----------------------------------------------------------------------
@@ -40,7 +42,7 @@ class group_stats extends NNScripts
      * The script version
      * @var string
      */
-    protected $scriptVersion = '0.3';
+    protected $scriptVersion = '0.4';
     
     /**
      * The group statistics
@@ -147,11 +149,21 @@ class group_stats extends NNScripts
         $ret = array();
         
         // Get all the active groups
-        $sql = "SELECT g.ID, g.name, g.last_updated
-                FROM groups AS g
-                WHERE g.active = 1
-                ORDER BY g.name ASC";
-        $groups = $this->db->query( $sql );
+        $selectQuery = $this->db->prepare("
+            SELECT
+                g.ID,
+                g.name,
+                g.last_updated
+            FROM
+                groups AS g
+            WHERE
+                g.active = 1
+            ORDER BY g.name ASC");
+
+        // Execute
+        $selectQuery->execute();
+        $groups = $selectQuery->fetchAll( PDO::FETCH_ASSOC );
+
         if( is_array($groups) && 0 < count($groups) )
         {
             foreach( $groups AS $row )
@@ -183,19 +195,28 @@ class group_stats extends NNScripts
         );
        
         // Get the release count
-        $sql = sprintf("SELECT count(1) AS total, SUM( r.size ) AS size
-                        FROM releases r
-                        WHERE r.groupID = %s", $this->db->escapeString( $groupId ));
-        $count = $this->db->query( $sql );
-        if( is_array($count) && 1 === count($count) )
+        $selectQuery = $this->db->prepare("
+            SELECT
+                COUNT(1) AS total,
+                SUM( r.size ) AS size
+            FROM
+                releases r
+            WHERE
+                r.groupID = :groupId");
+        
+        // Add the values and execute
+        $selectQuery->bindValue( ':groupId', $groupId, PDO::PARAM_INT );
+        $selectQuery->execute();
+        $releaseCount = $selectQuery->fetch( PDO::FETCH_ASSOC );
+
+        if( is_array($releaseCount) && 2 === count($releaseCount) )
         {
-            $row = $count[0];
             $ret = array(
-                'total' => (int)$row['total'],
-                'size'  => (int)$row['size']
+                'total' => (int)$releaseCount['total'],
+                'size'  => (int)$releaseCount['size']
             );
         }
-        
+
         // Return
         return $ret;
     }
@@ -213,16 +234,25 @@ class group_stats extends NNScripts
         $ret = '0';
        
         // Get the release count
-        $sql = sprintf("SELECT r.postdate
-                        FROM releases AS r
-                        WHERE r.groupID = %s
-                        ORDER BY postdate ASC
-                        LIMIT 1", $this->db->escapeString( $groupId ));
-        $oldest = $this->db->query( $sql );
-        if( is_array($oldest) && 0 < count($oldest) )
+        $selectQuery = $this->db->prepare("
+            SELECT
+                r.postdate
+            FROM
+                releases AS r
+            WHERE
+                r.groupID = :groupId
+            ORDER BY
+                postdate ASC
+                LIMIT 1");
+        
+        // Bind the values and execute
+        $selectQuery->bindValue( ':groupId', $groupId, PDO::PARAM_INT );
+        $selectQuery->execute();
+        $oldest = $selectQuery->fetch( PDO::FETCH_ASSOC );
+
+        if( is_array($oldest) && 1 === count($oldest) )
         {
-            $row = $oldest[0];
-            $postDate = new DateTime( $row['postdate'] );
+            $postDate = new DateTime( $oldest['postdate'] );
             $now = new DateTime();
             $interval = $postDate->diff( $now );
             $ret = $interval->format( '%a days %h hours' );

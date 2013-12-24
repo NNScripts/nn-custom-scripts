@@ -7,6 +7,8 @@
  * @copyright (c) 2013 - NN Scripts
  *
  * Changelog:
+ * 0.2 - Changed to PDO and prepare statements
+ *
  * 0.1 - Initial version
  */
 //----------------------------------------------------------------------
@@ -35,7 +37,7 @@ class fix_prodji_releases extends NNScripts
      * The script version
      * @var string
      */
-    protected $scriptVersion = '0.1';
+    protected $scriptVersion = '0.2';
     
     /**
      * Allowed settings
@@ -55,6 +57,11 @@ class fix_prodji_releases extends NNScripts
      */
     private $fixed = false;
 
+    /**
+     * The query to update the database records
+     * @var null|PDOStatement
+     */
+    private $updateQuery = null;
 
 
 
@@ -108,25 +115,45 @@ class fix_prodji_releases extends NNScripts
      */
     protected function getReleases()
     {
-        $sql = "SELECT r.ID, r.name, rf.name AS filename
-                FROM `releases` r
-                INNER JOIN `category` c ON (c.id = r.categoryID)
-                INNER JOIN `releasefiles` rf ON (rf.releaseID = r.ID)
-                WHERE r.name REGEXP '^HD[0-9]{5}.*PRoDJi(\.Dual)?$'
+        // Build the query
+        $sql = "
+            SELECT
+                r.ID,
+                r.name,
+                rf.name AS filename
+            FROM
+                `releases` r
+            INNER JOIN
+                `category` c ON (c.id = r.categoryID)
+            INNER JOIN
+                `releasefiles` rf ON (rf.releaseID = r.ID)
+            WHERE
+                r.name REGEXP '^HD[0-9]{5}.*PRoDJi(\.Dual)?$'
                 AND c.parentID = '2000'
-                AND rf.name REGEXP '\.mkv$'";
+                AND rf.name REGEXP '\.mkv$'
+        ";
+
         if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
-        {
-            $sql .= sprintf( ' AND r.adddate >= "%s" - INTERVAL %s HOUR', $this->settings['now'], $this->settings['limit'] );
-        }                     
+            $sql .= 'AND r.adddate >= :startDate - INTERVAL :limit HOUR';
+
         $sql .= " GROUP BY r.ID";
 
-        $releases = $this->db->query( $sql );
-        if( is_array( $releases ) && 0 < count( $releases ) )
+        // Prepare query
+        $selectQuery = $this->db->prepare( $sql );
+
+        // Bind the parameters
+        if( is_numeric( $this->settings['limit'] ) && 0 < $this->settings['limit'] )
         {
-            return $releases;
+            $selectQuery->bindValue( ':startDate', $this->settings['now'], PDO::PARAM_STR );
+            $selectQuery->bindValue( ':limit', $this->settings['limit'], PDO::PARAM_INT );
         }
-        return array();
+
+        // Execute
+        $selectQuery->execute();
+        $releases = $selectQuery->fetchAll( PDO::FETCH_ASSOC );
+
+        // Return
+        return ( ( is_array( $releases ) && 0 < count( $releases ) ) ? $releases : array() );
     }
     
             
@@ -155,14 +182,27 @@ class fix_prodji_releases extends NNScripts
             // Update
             $this->fixed = true;
             $this->display( sprintf( 'Renaming release: [%s] to [%s]'. PHP_EOL, $release['name'], str_replace( '.', ' ', $newName ) ) );
+
+            // Build the prepare sql statement
+            if( null === $this->updateQuery ) {
+                $this->updateQuery = $this->db->prepare('
+                    UPDATE
+                        releases r
+                    SET
+                        r.name = :name,
+                        r.searchname = :searchname
+                    WHERE
+                        r.id = :id
+                ');
+            }
             
-            $updateSql = sprintf(
-                'UPDATE releases r SET r.name = %s, r.searchname = %s WHERE r.id = %d',
-                $this->db->escapeString( str_replace( '.', ' ', $newName ) ),
-                $this->db->escapeString( $newName ),
-                (int)$release['ID']
-            );
-            $this->db->query( $updateSql );
+            // Bind the correct parameters 
+            $this->updateQuery->bindValue( ':name', str_replace( '.', ' ', $newName ), PDO::PARAM_STR );
+            $this->updateQuery->bindValue( ':searchname', $newName, PDO::PARAM_STR );
+            $this->updateQuery->bindValue( ':id', $release['ID'], PDO::PARAM_INT );
+            
+            // Execute
+            $this->updateQuery->execute();
         }
     }
 }
@@ -173,7 +213,7 @@ try
     // Init
     $sphinx = new Sphinx();
 
-    // Load the blacklistReleases class
+    // Load the fix_proji_releases class
     $fpr = new fix_prodji_releases();
     $fpr->fix();
 
